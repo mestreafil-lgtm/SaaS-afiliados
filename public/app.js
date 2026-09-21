@@ -5968,10 +5968,7 @@
         status.className = "form-status ok";
         const periodo = r.range?.since && r.range?.until ? ` · ${r.range.since} a ${r.range.until}` : "";
         const gasto = r.gasto != null ? ` · gasto ${Number(r.gasto).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
-        const classif = r.classificados
-          ? ` · ${r.classificados} SubIDs classificados (${r.ativas || 0} ativas / ${r.desativadas || 0} desativadas)`
-          : "";
-        status.textContent = `Pinterest: ${r.gravados} linhas${classif}${gasto}${periodo}. Ajuste o período para ver Campanhas Pinterest.`;
+        status.textContent = `Pinterest: ${r.gravados} linhas gravadas${gasto}${periodo}. Canal dos SubIDs não muda no upload — classifique em Indefinidos.`;
         await loadDashboard({ force: false });
       } catch (err) {
         status.className = "form-status err";

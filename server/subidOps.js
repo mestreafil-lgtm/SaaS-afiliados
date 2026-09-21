@@ -346,11 +346,12 @@ function applyOpsToSubIds(subIds, opsMap) {
     const key = String(r.subid || "").trim().toLowerCase();
     const hasOps = Object.prototype.hasOwnProperty.call(map, key);
     const op = hasOps ? map[key] : {};
-    // Com registro em subid_ops: canal da UI/sync — NÃO re-inferir por gasto do período
-    // (isso fazia classificados "sumirem" e voltarem pra indefinidos ao mudar período/CSV).
+    // Canal SÓ de subid_ops (classificação manual). Sem registro = indefinido.
+    // Nunca inferir por gasto do período/CSV — isso fazia a lista de indefinidos
+    // "sumir" ao subir Pin do mês e voltar quando o gasto saía do período.
     const canal = hasOps
       ? (normalizeCanal(op.canal) || "indefinido")
-      : inferCanal(r.subid, r.inv_meta, r.inv_pin);
+      : "indefinido";
     const status = resolveSubidStatus(op, r);
     return {
       ...r,

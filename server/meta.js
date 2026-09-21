@@ -467,47 +467,11 @@ async function syncMetaDaily({ daysBack = 7, since, until } = {}, userId = requi
 }
 
 /**
- * Grude o canal="meta" em subid_ops para todo SubID que já teve gasto Meta.
- * Mirror do applyPinterestCsvOps, mas puxando o histórico do meta_ads_daily
- * (para que campanhas pausadas continuem atribuindo vendas atrasadas ao Meta).
- * Não sobrescreve canal já definido (pinterest/organico/meta manuais são preservados).
+ * Canal Meta não é mais auto-atribuído no sync — só pela UI de indefinidos.
+ * Mantido como no-op p/ callers (import/sync) não quebrarem.
  */
-async function applyMetaSyncOps(userId = requireUserId()) {
-  const supabase = getSupabase();
-  const subs = new Set();
-  const pageSize = 1000;
-  const maxPages = 50;
-  for (let page = 0; page < maxPages; page++) {
-    const from = page * pageSize;
-    const { data, error } = await supabase
-      .from("meta_ads_daily")
-      .select("subid, gasto")
-      .eq("user_id", userId)
-      .not("subid", "is", null)
-      .gt("gasto", 0)
-      .range(from, from + pageSize - 1);
-    if (error) throw new Error(error.message);
-    if (!data || !data.length) break;
-    for (const r of data) {
-      const s = String(r.subid || "").trim();
-      if (s) subs.add(s);
-    }
-    if (data.length < pageSize) break;
-  }
-  if (!subs.size) return { total: 0, classificados: 0 };
-
-  const { loadSubidOps, upsertSubidOpsMany } = require("./subidOps");
-  const prevMap = await loadSubidOps(userId);
-  const toClassify = [];
-  for (const subid of subs) {
-    const key = subid.toLowerCase();
-    // Só classifica SubID SEM registro em ops — indefinido manual/persistido fica pra UI
-    if (Object.prototype.hasOwnProperty.call(prevMap, key)) continue;
-    toClassify.push({ subid, canal: "meta" });
-  }
-  if (!toClassify.length) return { total: subs.size, classificados: 0 };
-  await upsertSubidOpsMany(toClassify, userId);
-  return { total: subs.size, classificados: toClassify.length };
+async function applyMetaSyncOps(_userId = requireUserId()) {
+  return { total: 0, classificados: 0 };
 }
 
 /** Lista anúncios da conta com status de entrega (effective_status). */
@@ -575,25 +539,21 @@ async function syncMetaAdStatuses({ token, apiVersion, accountIds, userId = requ
     if (status === "ativa") ativas += 1;
     else desativadas += 1;
 
-    const prev = prevMap[subid.toLowerCase()] || {};
-    const hasOps = Object.prototype.hasOwnProperty.call(prevMap, subid.toLowerCase());
+    const key = subid.toLowerCase();
+    const hasOps = Object.prototype.hasOwnProperty.call(prevMap, key);
+    const prev = hasOps ? prevMap[key] : {};
     if (isManualStatusLocked(prev)) {
       preservadosManual += 1;
       continue;
     }
-    // Outro canal: status não vem da Meta
-    if (hasOps && (prev.canal === "pinterest" || prev.canal === "organico" || prev.canal === "indefinido")) {
-      continue;
-    }
+    // Só atualiza status de quem JÁ é Meta — não cria/promove canal
+    if (!hasOps || prev.canal !== "meta") continue;
 
-    const row = {
+    toUpsert.push({
       subid,
       status,
       status_source: "meta",
-    };
-    // Canal Meta só em SubID novo (sem ops) ou já meta
-    if (!hasOps || !prev.canal || prev.canal === "meta") row.canal = "meta";
-    toUpsert.push(row);
+    });
   }
 
   if (toUpsert.length) await upsertSubidOpsMany(toUpsert, userId);

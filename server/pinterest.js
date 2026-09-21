@@ -256,28 +256,16 @@ async function applyPinterestCsvOps(rows, userId = requireUserId()) {
   const { upsertSubidOpsMany, loadSubidOps, isManualStatusLocked } = require("./subidOps");
   const prevMap = await loadSubidOps(userId);
   const ops = [];
+  // CSV (diário ou mensal) NÃO classifica canal — só status de quem JÁ é pinterest.
+  // Indefinidos ficam pra UI; senão a lista muda a cada upload.
   for (const r of summarizePinSubIds(rows)) {
     const key = String(r.subid || "").toLowerCase();
-    const hasOps = Object.prototype.hasOwnProperty.call(prevMap, key);
-    const prev = hasOps ? prevMap[key] : {};
-    const fromEntity = pinStatusFromEntity(r.statusRaw);
-
-    // Sem registro: cria como Pinterest (SubID novo do CSV)
-    if (!hasOps) {
-      const row = { subid: r.subid, canal: "pinterest" };
-      if (fromEntity) {
-        row.status = fromEntity;
-        row.status_source = "pinterest";
-      }
-      ops.push(row);
-      continue;
-    }
-
-    // Já existe ops: NUNCA muda canal (indefinido/meta/organico/pinterest ficam como o cliente deixou)
+    if (!Object.prototype.hasOwnProperty.call(prevMap, key)) continue;
+    const prev = prevMap[key] || {};
+    if (prev.canal !== "pinterest") continue;
     if (isManualStatusLocked(prev)) continue;
-    if (prev.canal === "meta" || prev.canal === "organico") continue;
-    // Só atualiza status de entrega para quem já é Pinterest
-    if (prev.canal === "pinterest" && fromEntity) {
+    const fromEntity = pinStatusFromEntity(r.statusRaw);
+    if (fromEntity) {
       ops.push({ subid: r.subid, status: fromEntity, status_source: "pinterest" });
     }
   }
@@ -287,18 +275,15 @@ async function applyPinterestCsvOps(rows, userId = requireUserId()) {
   const staleSubIds = await sweepStaleActivePinSubIds(userId, uploadMaxDate, seenNow);
   for (const subid of staleSubIds) {
     const key = String(subid || "").toLowerCase();
-    const hasOps = Object.prototype.hasOwnProperty.call(prevMap, key);
-    const prev = hasOps ? prevMap[key] : {};
-    if (!hasOps) {
-      ops.push({ subid, canal: "pinterest", status: "desativada", status_source: "pinterest" });
-      continue;
-    }
-    if (isManualStatusLocked(prev)) continue;
+    const prev = prevMap[key] || {};
     if (prev.canal !== "pinterest") continue;
+    if (isManualStatusLocked(prev)) continue;
     ops.push({ subid, status: "desativada", status_source: "pinterest" });
   }
 
-  if (!ops.length) return { total: 0, ativas: 0, desativadas: 0 };
+  if (!ops.length) {
+    return { total: 0, ativas: 0, desativadas: 0, desativadasPorSumico: staleSubIds.length };
+  }
   await upsertSubidOpsMany(ops, userId);
   return {
     total: ops.length,

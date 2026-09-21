@@ -247,7 +247,7 @@ async function enrichDashboardWithAds(dash, userId = requireUserId(), { persistS
     loadSettings(userId).catch((e) => { console.warn("[finance] settings:", e.message); return null; }),
     loadMetaSpendByDay(start, end, userId).catch((e) => { console.warn("[finance] meta:", e.message); return []; }),
     loadPinSpendByDay(start, end, userId).catch((e) => { console.warn("[finance] pin:", e.message); return []; }),
-    loadSubidOps(userId).catch((e) => { console.warn("[finance] ops:", e.message); return {}; }),
+    loadSubidOps(userId),
     loadShopeeClicksByDay(start, end, userId).catch((e) => { console.warn("[finance] cliques:", e.message); return []; }),
   ]);
   const tax = taxRes || { taxRate: 11.7, metaTaxRate: 12 };
