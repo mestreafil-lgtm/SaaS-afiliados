@@ -431,10 +431,8 @@ async function enrichDashboardWithAds(dash, userId = requireUserId(), { persistS
     const invPin = pin.bySub[key] || 0;
     const fin = calcLucroRoi(r.comissao, invMeta, invPin, tax);
     const dailyRows = buildSubDaily(key, r.daily);
-    let canal = r.canal || null;
-    if (!canal) {
-      canal = inferCanal(r.subid, fin.inv_meta, fin.inv_pin);
-    }
+    // Canal definitivo vem só de applyOpsToSubIds (subid_ops) — não inferir aqui
+    const canal = null;
     // Status operacional: só subid_ops (global) — enrich não repassa snapshot antigo.
     const status = null;
     const cliquesMeta = meta.clicksBySub[key] || 0;

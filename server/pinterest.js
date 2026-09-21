@@ -257,42 +257,45 @@ async function applyPinterestCsvOps(rows, userId = requireUserId()) {
   const prevMap = await loadSubidOps(userId);
   const ops = [];
   for (const r of summarizePinSubIds(rows)) {
-    const prev = prevMap[String(r.subid || "").toLowerCase()] || {};
-    if (isManualStatusLocked(prev)) {
-      // Só preenche canal se ainda estiver vazio/indefinido — nunca troca Meta/orgânico
-      if (!prev.canal || prev.canal === "indefinido") {
-        ops.push({ subid: r.subid, canal: "pinterest" });
+    const key = String(r.subid || "").toLowerCase();
+    const hasOps = Object.prototype.hasOwnProperty.call(prevMap, key);
+    const prev = hasOps ? prevMap[key] : {};
+    const fromEntity = pinStatusFromEntity(r.statusRaw);
+
+    // Sem registro: cria como Pinterest (SubID novo do CSV)
+    if (!hasOps) {
+      const row = { subid: r.subid, canal: "pinterest" };
+      if (fromEntity) {
+        row.status = fromEntity;
+        row.status_source = "pinterest";
       }
+      ops.push(row);
       continue;
     }
-    // Canal já decidido pelo cliente (ou Meta): CSV Pin não rouba classificação
-    if (prev.canal === "meta" || prev.canal === "organico") continue;
 
-    const fromEntity = pinStatusFromEntity(r.statusRaw);
-    // Espelha applyMetaSyncOps: canal só se vazio/indefinido/já-pin; status do entity
-    const row = { subid: r.subid };
-    if (!prev.canal || prev.canal === "indefinido" || prev.canal === "pinterest") {
-      row.canal = "pinterest";
+    // Já existe ops: NUNCA muda canal (indefinido/meta/organico/pinterest ficam como o cliente deixou)
+    if (isManualStatusLocked(prev)) continue;
+    if (prev.canal === "meta" || prev.canal === "organico") continue;
+    // Só atualiza status de entrega para quem já é Pinterest
+    if (prev.canal === "pinterest" && fromEntity) {
+      ops.push({ subid: r.subid, status: fromEntity, status_source: "pinterest" });
     }
-    if (fromEntity) {
-      row.status = fromEntity;
-      row.status_source = "pinterest";
-    }
-    if (row.canal || row.status) ops.push(row);
   }
 
   const uploadMaxDate = rows.reduce((m, r) => (r.data > m ? r.data : m), "");
   const seenNow = summarizePinSubIds(rows).map((r) => r.subid);
   const staleSubIds = await sweepStaleActivePinSubIds(userId, uploadMaxDate, seenNow);
   for (const subid of staleSubIds) {
-    const prev = prevMap[String(subid || "").toLowerCase()] || {};
-    if (isManualStatusLocked(prev)) continue;
-    if (prev.canal === "meta" || prev.canal === "organico") continue;
-    const row = { subid, status: "desativada", status_source: "pinterest" };
-    if (!prev.canal || prev.canal === "indefinido" || prev.canal === "pinterest") {
-      row.canal = "pinterest";
+    const key = String(subid || "").toLowerCase();
+    const hasOps = Object.prototype.hasOwnProperty.call(prevMap, key);
+    const prev = hasOps ? prevMap[key] : {};
+    if (!hasOps) {
+      ops.push({ subid, canal: "pinterest", status: "desativada", status_source: "pinterest" });
+      continue;
     }
-    ops.push(row);
+    if (isManualStatusLocked(prev)) continue;
+    if (prev.canal !== "pinterest") continue;
+    ops.push({ subid, status: "desativada", status_source: "pinterest" });
   }
 
   if (!ops.length) return { total: 0, ativas: 0, desativadas: 0 };

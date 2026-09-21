@@ -500,11 +500,10 @@ async function applyMetaSyncOps(userId = requireUserId()) {
   const prevMap = await loadSubidOps(userId);
   const toClassify = [];
   for (const subid of subs) {
-    const prev = prevMap[subid.toLowerCase()];
-    // Preserva canal já decidido (pinterest/organico/meta manual). Só preenche vazio ou indefinido.
-    if (!prev || !prev.canal || prev.canal === "indefinido") {
-      toClassify.push({ subid, canal: "meta" });
-    }
+    const key = subid.toLowerCase();
+    // Só classifica SubID SEM registro em ops — indefinido manual/persistido fica pra UI
+    if (Object.prototype.hasOwnProperty.call(prevMap, key)) continue;
+    toClassify.push({ subid, canal: "meta" });
   }
   if (!toClassify.length) return { total: subs.size, classificados: 0 };
   await upsertSubidOpsMany(toClassify, userId);
@@ -577,20 +576,23 @@ async function syncMetaAdStatuses({ token, apiVersion, accountIds, userId = requ
     else desativadas += 1;
 
     const prev = prevMap[subid.toLowerCase()] || {};
+    const hasOps = Object.prototype.hasOwnProperty.call(prevMap, subid.toLowerCase());
     if (isManualStatusLocked(prev)) {
       preservadosManual += 1;
       continue;
     }
     // Outro canal: status não vem da Meta
-    if (prev.canal === "pinterest" || prev.canal === "organico") continue;
+    if (hasOps && (prev.canal === "pinterest" || prev.canal === "organico" || prev.canal === "indefinido")) {
+      continue;
+    }
 
     const row = {
       subid,
       status,
       status_source: "meta",
     };
-    if (!prev.canal || prev.canal === "indefinido") row.canal = "meta";
-    else if (prev.canal === "meta") row.canal = "meta";
+    // Canal Meta só em SubID novo (sem ops) ou já meta
+    if (!hasOps || !prev.canal || prev.canal === "meta") row.canal = "meta";
     toUpsert.push(row);
   }
 

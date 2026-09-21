@@ -63,17 +63,45 @@ function resolveNextCanal(prev, incoming) {
 function preferOpsRow(a, b) {
   if (!a) return b;
   if (!b) return a;
-  const aClass = isClassifiedCanal(a.canal);
-  const bClass = isClassifiedCanal(b.canal);
-  if (aClass && !bClass) return a;
-  if (bClass && !aClass) return b;
+  // Manual sempre ganha (classificação do cliente na UI)
   const aManual = a.status_source === "manual" || a.status === "teste";
   const bManual = b.status_source === "manual" || b.status === "teste";
   if (aManual && !bManual) return a;
   if (bManual && !aManual) return b;
+  const aClass = isClassifiedCanal(a.canal);
+  const bClass = isClassifiedCanal(b.canal);
+  if (aClass && !bClass) return a;
+  if (bClass && !aClass) return b;
   // Mesmo canal: preferir quem tem status preenchido
   if (b.status && !a.status) return b;
   return a;
+}
+
+/** Remove variantes de caixa legadas (Unha001) após gravar chave canônica. */
+async function deleteCaseVariants(userId, keys) {
+  const list = [...new Set((Array.isArray(keys) ? keys : [keys]).map(opsSubidKey).filter(Boolean))];
+  if (!list.length) return;
+  const supabase = getSupabase();
+  try {
+    const want = new Set(list);
+    const { data, error } = await supabase
+      .from("subid_ops")
+      .select("subid")
+      .eq("user_id", userId);
+    if (error || !data?.length) return;
+    const dupes = data.filter((r) => {
+      const raw = String(r.subid || "");
+      const low = raw.toLowerCase();
+      return want.has(low) && raw !== low;
+    });
+    for (const d of dupes) {
+      await supabase
+        .from("subid_ops")
+        .delete()
+        .eq("user_id", userId)
+        .eq("subid", d.subid);
+    }
+  } catch (_) { /* ignore */ }
 }
 
 /** Status manual / teste / legado com valor setado — sync Meta/Pin não sobrescreve. */
@@ -131,8 +159,9 @@ async function loadSubidOps(userId = requireUserId()) {
       }
       return map;
     } catch (e) {
-      console.warn("[subidOps] load:", e.message);
-      return {};
+      // Nunca devolver {} — senão o dashboard trata tudo como indefinido/inferido
+      console.error("[subidOps] load falhou:", e.message);
+      throw e;
     }
   });
 }
@@ -183,6 +212,7 @@ async function upsertSubidOps(subid, partial, userId = requireUserId()) {
     ({ error } = await supabase.from("subid_ops").upsert(legacy, { onConflict: "user_id,subid" }));
   }
   if (error) throw new Error(error.message);
+  await deleteCaseVariants(userId, [key]);
   invalidateRequestCache(`loadSubidOps:${userId}`);
   return row;
 }
@@ -238,6 +268,8 @@ async function upsertSubidOpsMany(rows, userId = requireUserId()) {
     }
     if (error) throw new Error(error.message);
   }
+  const keys = [...new Set(payload.map((r) => r.subid).filter(Boolean))];
+  await deleteCaseVariants(userId, keys);
   invalidateRequestCache(`loadSubidOps:${userId}`);
   return payload.length;
 }
@@ -309,10 +341,16 @@ function inferCanal(subid, invMeta, invPin) {
 }
 
 function applyOpsToSubIds(subIds, opsMap) {
+  const map = opsMap || {};
   return (subIds || []).map((r) => {
     const key = String(r.subid || "").trim().toLowerCase();
-    const op = opsMap[key] || {};
-    const canal = op.canal || inferCanal(r.subid, r.inv_meta, r.inv_pin);
+    const hasOps = Object.prototype.hasOwnProperty.call(map, key);
+    const op = hasOps ? map[key] : {};
+    // Com registro em subid_ops: canal da UI/sync — NÃO re-inferir por gasto do período
+    // (isso fazia classificados "sumirem" e voltarem pra indefinidos ao mudar período/CSV).
+    const canal = hasOps
+      ? (normalizeCanal(op.canal) || "indefinido")
+      : inferCanal(r.subid, r.inv_meta, r.inv_pin);
     const status = resolveSubidStatus(op, r);
     return {
       ...r,
