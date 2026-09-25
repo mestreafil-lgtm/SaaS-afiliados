@@ -3260,9 +3260,12 @@
           sel.className = `op-select op-status-select st-${normalizeStatus(value)}`;
           await saveSubidOp(subid, { status: value, status_source: "manual" });
         } else if (field === "canal") {
+          // Sempre marca 'manual' quando o cliente mexe no canal — inclusive
+          // ao voltar para "indefinido". Sem o carimbo, o server preserva o
+          // canal classificado atual (proteção contra revert acidental).
           await saveSubidOp(subid, {
             canal: value,
-            ...(value && value !== "indefinido" ? { status_source: "manual" } : {}),
+            status_source: "manual",
           });
         } else {
           await saveSubidOp(subid, { [field]: value });
@@ -4126,7 +4129,7 @@
       try {
         await saveSubidOp(ctx.subid, ctx.mode === "status"
           ? { status: value, status_source: "manual" }
-          : ctx.mode === "canal" && value && value !== "indefinido"
+          : ctx.mode === "canal"
             ? { canal: value, status_source: "manual" }
             : { [ctx.mode]: value });
       } catch (err) {

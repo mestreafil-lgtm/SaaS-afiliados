@@ -174,10 +174,26 @@ async function upsertSubidOps(subid, partial, userId = requireUserId()) {
   const prev = prevMap[key] || {};
   const nextStatus =
     partial.status != null ? normalizeStatus(partial.status) : normalizeStatus(prev.status);
-  const nextCanal =
-    partial.canal !== undefined
-      ? normalizeCanal(partial.canal)
-      : normalizeCanal(prev.canal);
+
+  // Rebaixar canal classificado (meta/pin/org) para indefinido exige intenção
+  // explícita: partial.status_source === "manual". Sem isso, preserva o canal
+  // atual — protege contra POSTs acidentais (mobile pick, race, código legado)
+  // que reverteriam a classificação do cliente.
+  const prevCanal = normalizeCanal(prev.canal);
+  const incomingCanal = partial.canal !== undefined ? normalizeCanal(partial.canal) : undefined;
+  const explicitManual = partial.status_source === "manual";
+  let nextCanal;
+  if (incomingCanal === undefined) {
+    nextCanal = prevCanal;
+  } else if (
+    isClassifiedCanal(prevCanal)
+    && (incomingCanal === "indefinido" || incomingCanal == null)
+    && !explicitManual
+  ) {
+    nextCanal = prevCanal;
+  } else {
+    nextCanal = incomingCanal;
+  }
 
   // UI: status OU canal classificado → trava manual (sync não apaga)
   let nextSource = normalizeStatusSource(prev.status_source);
