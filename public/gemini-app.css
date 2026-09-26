@@ -2988,6 +2988,24 @@ html, body {
   .data-table:not(#ops-table) { min-width: 720px; }
   #ops-table.data-table--ops { min-width: 520px; }
   #indef-table { min-width: 640px; }
+#indef-table td.subid.is-clickable {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+#indef-table td.subid.is-clickable .subid-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+#indef-table td.subid.is-clickable:hover .subid-label {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 }
 /* Laptop estreito — reforça wrap dos KPIs em todos os menus de campanha */
 @media (max-width: 1399px) {

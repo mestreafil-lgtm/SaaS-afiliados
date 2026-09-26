@@ -4179,8 +4179,12 @@
     if (pill) pill.textContent = fmtNum(list.length);
     tb.innerHTML = list.map((r) => {
       const id = String(r.subid || "");
+      const safe = escapeHtml(id);
       return `<tr>
-        <td class="subid">${escapeHtml(id)}</td>
+        <td class="subid is-clickable" data-subid-copy="${safe}" title="Clique para copiar">
+          <span class="subid-label">${safe}</span>
+          <button type="button" class="subid-copy-btn" data-subid-copy="${safe}" title="Copiar SubID" aria-label="Copiar SubID"><i class="fa-solid fa-copy" aria-hidden="true"></i></button>
+        </td>
         <td>${canalSelectHtml(id, "indefinido")}</td>
         <td>${statusSelectHtml(id, r.status)}</td>
         <td class="num">${fmt(r.faturamento)}</td>
@@ -4188,6 +4192,22 @@
       </tr>`;
     }).join("") || `<tr><td colspan="5">Nenhum SubID indefinido — todos já estão em um canal.</td></tr>`;
     wireOpsSelects("#indef-tbody");
+    wireIndefinidosCopy();
+  }
+
+  function wireIndefinidosCopy() {
+    const tb = $("#indef-tbody");
+    if (!tb || tb.dataset.copyWired === "1") return;
+    tb.dataset.copyWired = "1";
+    tb.addEventListener("click", (e) => {
+      if (e.target.closest("select, input, a, label, .op-select")) return;
+      const hit = e.target.closest("[data-subid-copy]");
+      if (!hit) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = hit.classList.contains("subid-copy-btn") ? hit : hit.querySelector(".subid-copy-btn");
+      copySubIdText(hit.dataset.subidCopy, btn || hit);
+    });
   }
 
   function renderPager(el, page, total, pageSize, onPage) {
