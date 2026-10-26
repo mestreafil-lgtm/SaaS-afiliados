@@ -416,7 +416,7 @@
       const channelKeys = ["campanhas-meta", "campanhas-pinterest", "campanhas-organicas"];
       let tab = "dashboard";
       if (channelKeys.includes(navKey)) tab = "campanhas";
-      else if (navKey === "supercomissoes") tab = "supercomissoes";
+      else if (navKey === "produtos") tab = "produtos";
       else if (navKey === "analise-ia") tab = "analise-ia";
       else if (navKey === "dashboard") tab = "dashboard";
       else tab = "menu";
@@ -805,6 +805,7 @@
       metaBonus100: 1,
       metaBonus125: 2,
       metaBonus150: 3,
+      metaBonusNoLucro: false,
       teamName: "SaaS SHOPPE",
       teamPlan: "Shopee · Meta",
     },
@@ -893,8 +894,14 @@
 
   function displayRoi(r) {
     if (!r) return null;
-    if (r.roi != null && Number.isFinite(Number(r.roi))) return Number(r.roi);
+    const share = bonusShareOf(r);
     const inv = investForRoi(r);
+    if (share) {
+      if (inv <= 0) return null;
+      const base = r.lucro != null ? Number(r.lucro) : Number(r.comissao || 0) - inv;
+      return ((base + share) / inv) * 100;
+    }
+    if (r.roi != null && Number.isFinite(Number(r.roi))) return Number(r.roi);
     if (inv <= 0) return null;
     const gov = Number(state.settings.taxRate || 0) / 100;
     const lucro = r.lucro != null
@@ -1220,6 +1227,7 @@
   }
 
   function setView(navKey) {
+    if (navKey === "supercomissoes") navKey = "produtos";
     let view = navKey === "integracoes" ? "config" : navKey;
     if (view === "subids") view = "dashboard";
 
@@ -1249,7 +1257,6 @@
 
     const isData = DATA_VIEWS.has(view);
     $("#view-dashboard").classList.toggle("hidden", view !== "dashboard");
-    $("#view-supercomissoes")?.classList.toggle("hidden", view !== "supercomissoes");
     $("#view-analise-ia")?.classList.toggle("hidden", view !== "analise-ia");
     $("#view-canais")?.classList.toggle("hidden", view !== "canais");
     $("#view-config").classList.toggle("hidden", view !== "config");
@@ -1261,7 +1268,6 @@
     MobileChrome.closeSheetsQuiet();
 
     if (view === "dashboard") applyChannelView();
-    if (view === "supercomissoes") mountRadarPage();
     if (view === "analise-ia") {
       mountIaChat();
       updateIaTokenBoard();
@@ -1337,8 +1343,9 @@
       ? Number(k.inv_meta_taxed != null ? k.inv_meta_taxed : invMeta || 0)
       : null;
     const metaHasTax = hasData && invMeta > 0 && invMetaTaxed > invMeta + 0.005;
-    const lucro = !hasData ? null : (k.lucro != null ? Number(k.lucro) : Number(k.comissao || 0) - Number(invTotal || 0));
-    const roi = hasData ? k.roi : null;
+    const kLucro = hasData ? withBonusLucro(k, "geral") : k;
+    const lucro = !hasData ? null : (kLucro.lucro != null ? Number(kLucro.lucro) : Number(k.comissao || 0) - Number(invTotal || 0));
+    const roi = hasData ? kLucro.roi : null;
     const hasRoi = hasData && invTotal > 0 && Number.isFinite(Number(roi));
     const subs = hasData && subCount != null ? fmtNum(subCount) : "—";
     const fat = hasData ? Number(k.faturamento || 0) : null;
@@ -1361,7 +1368,7 @@
             <span class="text-lg font-bold text-emerald-200 shrink-0">R$</span>
             <span>${money(lucro)}</span>
           </div>
-          <p class="text-[11px] text-emerald-100/90 mt-1 font-medium">Lucro real após mídia e impostos</p>
+          <p class="text-[11px] text-emerald-100/90 mt-1 font-medium">${kLucro?.bonusMes ? `Inclui ${escapeHtml(kLucro.bonusLabel || "bônus")} · ${money(kLucro.bonusMes)} até ${fmtDia(kLucro.corte)}` : "Lucro real após mídia e impostos"}</p>
         </div>
         <div class="relative grid grid-cols-2 gap-1.5 sm:gap-2 pt-3 border-t border-white/20 text-center min-w-0">
           <div class="bg-black/10 p-1.5 rounded-xl min-w-0">
@@ -1444,6 +1451,108 @@
     return new Date(y, m, 0).getDate();
   }
 
+  function fmtDia(iso) {
+    const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}` : "";
+  }
+
+  function mesDoOntem() {
+    const corte = yesterdayISO();
+    const [y, m] = corte.split("-").map(Number);
+    const ym = `${y}-${String(m).padStart(2, "0")}`;
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return {
+      corte,
+      start: `${ym}-01`,
+      end: `${ym}-${String(last).padStart(2, "0")}`,
+      ultimo: last,
+    };
+  }
+
+  /** Faixa batida no mês de ontem, bônus = % da faixa sobre o faturamento até ontem. */
+  function bonusMes() {
+    const mes = mesDoOntem();
+    const base = Number(state.settings.metaBase || 0);
+    const fat = Number(state.dash?.kpis?.faturamentoMtd || 0);
+    const tiers = metaBonusTiers();
+    let hit = null;
+    if (base > 0) {
+      for (const t of tiers) {
+        if (fat + 0.005 >= base * t.mult) hit = t;
+      }
+    }
+    const bonusVal = hit ? Math.round(fat * hit.bonus * 100) / 100 : 0;
+    const enabled = Boolean(state.settings.metaBonusNoLucro);
+    return {
+      ...mes,
+      base,
+      fat,
+      hit,
+      bonusVal,
+      enabled,
+      aplica: enabled && bonusVal > 0.004,
+    };
+  }
+
+  let _bonusAlloc = null;
+  function clearBonusAlloc() {
+    _bonusAlloc = null;
+  }
+  function bonusAlloc() {
+    if (_bonusAlloc) return _bonusAlloc;
+    const bonus = bonusMes();
+    const byId = new Map();
+    let metaTotal = 0;
+    if (bonus.aplica) {
+      const subs = (state.dash?.subIds || []).filter((r) => (r.canal || "") === "meta" && Number(r.faturamento || 0) > 0);
+      const totalFat = subs.reduce((acc, r) => acc + Number(r.faturamento || 0), 0);
+      if (subs.length && totalFat > 0) {
+        let assigned = 0;
+        subs.forEach((r, i) => {
+          const id = String(r.subid || "");
+          let share;
+          if (i === subs.length - 1) share = Math.round((bonus.bonusVal - assigned) * 100) / 100;
+          else {
+            share = Math.round(bonus.bonusVal * (Number(r.faturamento || 0) / totalFat) * 100) / 100;
+            assigned += share;
+          }
+          byId.set(id, share);
+          metaTotal += share;
+        });
+        metaTotal = Math.round(metaTotal * 100) / 100;
+      } else {
+        metaTotal = bonus.bonusVal;
+      }
+    }
+    _bonusAlloc = { bonus, byId, metaTotal };
+    return _bonusAlloc;
+  }
+
+  function bonusShareOf(r) {
+    if ((state.channel || "") !== "meta" || !r) return 0;
+    return bonusAlloc().byId.get(String(r.subid || "")) || 0;
+  }
+
+  function withBonusLucro(k, ch) {
+    if (!k) return k;
+    clearBonusAlloc();
+    const alloc = bonusAlloc();
+    if (!alloc.bonus.aplica) return k;
+    const extra = ch === "meta" ? alloc.metaTotal : (ch === "geral" ? alloc.bonus.bonusVal : 0);
+    if (!(extra > 0)) return k;
+    const lucro = Math.round((Number(k.lucro || 0) + extra) * 100) / 100;
+    const inv = Number(k.inv_total || 0);
+    const roi = inv > 0 ? Math.round((lucro / inv) * 10000) / 100 : k.roi;
+    return {
+      ...k,
+      lucro,
+      roi,
+      bonusMes: extra,
+      bonusLabel: alloc.bonus.hit?.label || "bônus",
+      corte: alloc.bonus.corte,
+    };
+  }
+
   function metaBonusTiers() {
     const b100 = Number(state.settings.metaBonus100 != null ? state.settings.metaBonus100 : 1) / 100;
     const b125 = Number(state.settings.metaBonus125 != null ? state.settings.metaBonus125 : 2) / 100;
@@ -1478,11 +1587,12 @@
     return Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "%";
   }
 
-  function cicloMetaLabel() {
-    const now = new Date();
-    const mes = now.toLocaleDateString("pt-BR", { month: "long" });
+  function cicloMetaLabel(iso) {
+    const [y, m, d] = String(iso || yesterdayISO()).split("-").map(Number);
+    const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+    const mes = dt.toLocaleDateString("pt-BR", { month: "long", timeZone: "UTC" });
     const mesCap = mes.charAt(0).toUpperCase() + mes.slice(1);
-    return `Ciclo ${mesCap}/${now.getFullYear()}`;
+    return `Ciclo ${mesCap}/${y}`;
   }
 
   function renderMetaProgressCard(k) {
@@ -1490,12 +1600,12 @@
     if (!el) return;
     const hasData = Boolean(state.dash);
     const base = Number(state.settings.metaBase || 0);
+    const ref = mesDoOntem();
     const fat = hasData ? Number(k?.faturamentoMtd ?? state.dash?.kpis?.faturamentoMtd ?? 0) : 0;
-    const today = todayISO();
     const totalDias = Number(state.settings.metaDias) > 0
       ? Number(state.settings.metaDias)
-      : daysInMonthISO(today);
-    const diasPassados = Number(String(today).slice(8, 10)) || 1;
+      : ref.ultimo;
+    const diasPassados = Number(String(ref.corte).slice(8, 10)) || 1;
     const diasRestantes = Math.max(0, totalDias - diasPassados);
     let expanded = false;
     try { expanded = localStorage.getItem("afilia:metaProjOpen") === "1"; } catch (_) { /* ignore */ }
@@ -1540,6 +1650,13 @@
     const pctM1 = m1 ? m1.pct * 100 : 0;
     const bonusPctLabel = (b) =>
       (b * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "%";
+    const batido = bonusMes();
+    const hitBanner = batido.hit
+      ? `Até ${fmtDia(batido.corte)} bateu <b>${escapeHtml(batido.hit.label)}</b> · bônus <b>${fmt(batido.bonusVal)}</b> (${bonusPctLabel(batido.hit.bonus)} sobre ${fmt(batido.fat)})`
+      : `Até ${fmtDia(batido.corte)} nenhuma faixa foi batida · faturamento ${fmt(batido.fat)}`;
+    const hitExtra = batido.enabled && batido.hit
+      ? " · incluído no lucro líquido e nos SubIDs da Meta"
+      : "";
 
     const tierCards = tiers.map((c, i) => {
       const isRec = i === recIdx;
@@ -1555,8 +1672,8 @@
             <span class="meta-tier-bonus-badge">+${bonusPctLabel(c.bonus)}</span>
           </div>
           <div class="meta-tier-bonus-box">
-            <span>Bônus estimado</span>
-            <strong>${fmt(c.bonusVal)}</strong>
+            <span>${c.atingida ? "Sobre o faturamento" : "Bônus estimado"}</span>
+            <strong>${fmt(c.atingida ? fat * c.bonus : c.bonusVal)}</strong>
           </div>
           <div class="meta-tier-prog">
             <div class="meta-tier-bar"><span style="width:${pctW.toFixed(1)}%"></span></div>
@@ -1574,7 +1691,7 @@
     const rowAlvo = tiers.map((c) => `<td>${fmt(c.alvo)}</td>`).join("");
     const rowFalta = tiers.map((c) => `<td>${fmt(c.falta)}</td>`).join("");
     const rowBonus = tiers.map((c, i) =>
-      `<td class="${i === recIdx ? "is-hl" : ""}">${fmt(c.bonusVal)}</td>`
+      `<td class="${i === recIdx ? "is-hl" : ""}">${fmt(c.atingida ? fat * c.bonus : c.bonusVal)}</td>`
     ).join("");
     const rowDiario = tiers.map((c) =>
       `<td>${c.diario == null ? "—" : `${fmt(c.diario)}/dia`}</td>`
@@ -1590,12 +1707,14 @@
           <div class="meta-proj-head-main">
             <div class="meta-proj-title-row">
               <h3 class="meta-proj-title">Metas e bônus do mês</h3>
-              <span class="meta-proj-ciclo">${escapeHtml(cicloMetaLabel())}</span>
+              <span class="meta-proj-ciclo">${escapeHtml(cicloMetaLabel(ref.corte))}</span>
             </div>
             <p class="meta-proj-sub">
-              ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"} restantes
+              ${fmtDia(ref.start)} a ${fmtDia(ref.end)} · realizado até ${fmtDia(ref.corte)}
+              · ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"} restantes
               ${ritmo100 != null ? ` · para 100%: <b>${fmt(ritmo100)}/dia</b>` : ""}
             </p>
+            <p class="meta-bonus-hit">${hitBanner}${hitExtra}</p>
           </div>
           <div class="meta-proj-head-stats">
             <div class="meta-proj-stat">
@@ -1791,6 +1910,7 @@
   function renderChannelKpis(ch, k) {
     const el = $("#channel-kpi-grid");
     if (!el) return;
+    if (ch === "meta") k = withBonusLucro(k, "meta");
     const hasData = Boolean(state.dash);
     const mobile = isMobileLayout();
     const money = (v) => (!hasData || v == null || Number.isNaN(Number(v)) ? "—" : fmt(v));
@@ -1838,7 +1958,11 @@
       value: money(k?.lucro),
       tone: lucroTone,
       icon: "lucro",
-      sub: { label: "ROI", value: pct(hasRoi ? k?.roi : null) },
+      sub: {
+        label: "ROI",
+        value: pct(hasRoi ? k?.roi : null),
+        extra: k?.bonusMes ? `Inclui ${k.bonusLabel || "bônus"} ${fmt(k.bonusMes)}` : "",
+      },
     };
     const cliquesCard = (withAbat) => ({
       key: "cliques",
@@ -2055,13 +2179,13 @@
     if (!document.querySelector("link[data-backup-css]")) {
       const l = document.createElement("link");
       l.rel = "stylesheet";
-      l.href = "/backup.css?v=mobile-1";
+      l.href = "/backup.css?v=pro-3";
       l.dataset.backupCss = "1";
       document.head.appendChild(l);
     }
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = "/backup.js?v=mobile-1";
+      s.src = "/backup.js?v=pro-3";
       s.async = true;
       s.onload = resolve;
       s.onerror = () => reject(new Error("backup.js"));
@@ -3642,7 +3766,7 @@
   function cellForSubidCol(r, col, ch) {
     const inv = investForRoi(r);
     const roi = displayRoi(r);
-    const lucro = r.lucro != null ? Number(r.lucro) : Number(r.comissao || 0) - inv;
+    const lucro = subidLucroValue(r);
     const abatC = clickAbatPct(r, ch);
     const abat = Number(r.faturamento) > 0
       ? commAbatPct(r.faturamento, r.comissao)
@@ -4386,8 +4510,8 @@
 
   function subidLucroValue(r) {
     if (!r) return 0;
-    if (r.lucro != null) return Number(r.lucro);
-    return Number(r.comissao || 0) - investForRoi(r);
+    const base = r.lucro != null ? Number(r.lucro) : Number(r.comissao || 0) - investForRoi(r);
+    return Math.round((base + bonusShareOf(r)) * 100) / 100;
   }
 
   function paintSubidFilterBar() {
@@ -4444,7 +4568,10 @@
       if (profitMode === "lucro") periodBit += " · filtro só lucro";
       else if (profitMode === "prejuizo") periodBit += " · filtro só prejuízo";
       eyebrow.dataset.periodBit = periodBit;
-      eyebrow.textContent = `canal ${chLabel} · altere o status | ${periodBit}`;
+      const bonusBit = ch === "meta" && bonusMes().aplica
+        ? ` · lucro inclui ${bonusMes().hit?.label || "bônus"} ${fmt(bonusMes().bonusVal)}`
+        : "";
+      eyebrow.textContent = `canal ${chLabel} · altere o status | ${periodBit}${bonusBit}`;
     }
 
     const tbody = $("#subid-tbody");
@@ -4605,7 +4732,7 @@
   function csvValueForSubidCol(r, col, ch) {
     const inv = investForRoi(r);
     const roi = displayRoi(r);
-    const lucro = r.lucro != null ? Number(r.lucro) : Number(r.comissao || 0) - inv;
+    const lucro = subidLucroValue(r);
     const abatC = clickAbatPct(r, ch);
     const abat = Number(r.faturamento) > 0
       ? commAbatPct(r.faturamento, r.comissao)
@@ -4707,7 +4834,7 @@
     const fat = Number(r.faturamento || 0);
     const com = Number(r.comissao || 0);
     const inv = investForRoi(r);
-    const lucro = r.lucro != null ? Number(r.lucro) : com - inv;
+    const lucro = subidLucroValue(r);
     const roi = displayRoi(r);
     const pedidos = Number(r.pedidos ?? r.concluidos ?? 0);
     const cliquesShopee = Number(r.cliques_shopee ?? r.cliques ?? 0);
@@ -5299,6 +5426,7 @@
         metaBonus100: s.metaBonus100,
         metaBonus125: s.metaBonus125,
         metaBonus150: s.metaBonus150,
+        metaBonusNoLucro: Boolean(s.metaBonusNoLucro),
       }));
     } catch (_) { /* ignore */ }
   }
@@ -5323,6 +5451,7 @@
         metaBonus100: s.metaBonus100 != null ? Number(s.metaBonus100) : (local?.metaBonus100 ?? 1),
         metaBonus125: s.metaBonus125 != null ? Number(s.metaBonus125) : (local?.metaBonus125 ?? 2),
         metaBonus150: s.metaBonus150 != null ? Number(s.metaBonus150) : (local?.metaBonus150 ?? 3),
+        metaBonusNoLucro: s.metaBonusNoLucro != null ? Boolean(s.metaBonusNoLucro) : Boolean(local?.metaBonusNoLucro),
         teamName: s.teamName,
         teamPlan: s.teamPlan,
       };
@@ -5332,6 +5461,7 @@
         if (local.metaBonus100 != null) state.settings.metaBonus100 = local.metaBonus100;
         if (local.metaBonus125 != null) state.settings.metaBonus125 = local.metaBonus125;
         if (local.metaBonus150 != null) state.settings.metaBonus150 = local.metaBonus150;
+        if (local.metaBonusNoLucro != null && s.metaBonusNoLucro == null) state.settings.metaBonusNoLucro = Boolean(local.metaBonusNoLucro);
       }
       cacheMetaProjSettings(state.settings);
       paintSettingsForms(state.settings);
@@ -6030,14 +6160,14 @@
     $("#settings-form-metas")?.addEventListener("submit", (e) => saveSettingsFromForms(e, "metas"));
     [
       "set-tax", "set-meta-tax", "set-team-name", "set-team-plan",
-      "set-meta-base", "set-meta-dias", "set-bonus-100", "set-bonus-125", "set-bonus-150",
+      "set-meta-base", "set-meta-dias", "set-bonus-100", "set-bonus-125", "set-bonus-150", "set-bonus-no-lucro",
     ].forEach((id) => {
       const inp = $(`#${id}`);
       if (!inp) return;
       inp.readOnly = false;
       inp.disabled = false;
       inp.addEventListener("change", () => {
-        const part = id.startsWith("set-bonus") || id === "set-meta-base" || id === "set-meta-dias" ? "metas" : "taxes";
+        const part = id.startsWith("set-bonus") || id === "set-meta-base" || id === "set-meta-dias" || id === "set-bonus-no-lucro" ? "metas" : "taxes";
         saveSettingsFromForms(null, part);
       });
     });
@@ -6094,6 +6224,7 @@
       metaBonus100: parseBrNumber($("#set-bonus-100")?.value || String(state.settings.metaBonus100 ?? 1)),
       metaBonus125: parseBrNumber($("#set-bonus-125")?.value || String(state.settings.metaBonus125 ?? 2)),
       metaBonus150: parseBrNumber($("#set-bonus-150")?.value || String(state.settings.metaBonus150 ?? 3)),
+      metaBonusNoLucro: Boolean($("#set-bonus-no-lucro")?.checked),
       teamName: ($("#set-team-name")?.value || state.settings.teamName || "").trim(),
       teamPlan: ($("#set-team-plan")?.value || state.settings.teamPlan || "").trim(),
     };
@@ -6107,6 +6238,7 @@
     if ($("#set-bonus-100")) $("#set-bonus-100").value = formatBrPctInput(s.metaBonus100);
     if ($("#set-bonus-125")) $("#set-bonus-125").value = formatBrPctInput(s.metaBonus125);
     if ($("#set-bonus-150")) $("#set-bonus-150").value = formatBrPctInput(s.metaBonus150);
+    if ($("#set-bonus-no-lucro")) $("#set-bonus-no-lucro").checked = Boolean(s.metaBonusNoLucro);
     if ($("#set-team-name")) $("#set-team-name").value = s.teamName || "";
     if ($("#set-team-plan")) $("#set-team-plan").value = s.teamPlan || "";
     if ($("#team-name")) $("#team-name").textContent = s.teamName || "";
@@ -6127,6 +6259,7 @@
             metaBonus100: all.metaBonus100,
             metaBonus125: all.metaBonus125,
             metaBonus150: all.metaBonus150,
+            metaBonusNoLucro: all.metaBonusNoLucro,
           }
         : {
             taxRate: all.taxRate,
@@ -6146,6 +6279,7 @@
         metaBonus100: s.metaBonus100 != null ? Number(s.metaBonus100) : (payload.metaBonus100 != null ? payload.metaBonus100 : state.settings.metaBonus100),
         metaBonus125: s.metaBonus125 != null ? Number(s.metaBonus125) : (payload.metaBonus125 != null ? payload.metaBonus125 : state.settings.metaBonus125),
         metaBonus150: s.metaBonus150 != null ? Number(s.metaBonus150) : (payload.metaBonus150 != null ? payload.metaBonus150 : state.settings.metaBonus150),
+        metaBonusNoLucro: s.metaBonusNoLucro != null ? Boolean(s.metaBonusNoLucro) : (payload.metaBonusNoLucro != null ? Boolean(payload.metaBonusNoLucro) : Boolean(state.settings.metaBonusNoLucro)),
         teamName: s.teamName != null ? s.teamName : (payload.teamName != null ? payload.teamName : state.settings.teamName),
         teamPlan: s.teamPlan != null ? s.teamPlan : (payload.teamPlan != null ? payload.teamPlan : state.settings.teamPlan),
       };

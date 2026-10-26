@@ -12,6 +12,7 @@ alter table if exists app_settings add column if not exists meta_dias numeric nu
 alter table if exists app_settings add column if not exists meta_bonus_100 numeric null default 1;
 alter table if exists app_settings add column if not exists meta_bonus_125 numeric null default 2;
 alter table if exists app_settings add column if not exists meta_bonus_150 numeric null default 3;
+alter table if exists app_settings add column if not exists meta_bonus_no_lucro boolean not null default false;
 alter table if exists app_settings add column if not exists claude_api_key text not null default '';
 alter table if exists app_settings add column if not exists claude_model text not null default 'claude-sonnet-4-20250514';
 

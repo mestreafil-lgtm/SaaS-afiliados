@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="/tailwind.css" />
-  <link rel="stylesheet" href="/gemini-app.css?v=subid-abat-29" />
+  <link rel="stylesheet" href="/gemini-app.css?v=bonus-1" />
 </head>
 <body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen antialiased selection:bg-brand-500 selection:text-white font-sans transition-colors duration-200">
 
@@ -157,14 +157,6 @@
               </button>
               <button type="button" class="nav-item" data-view="produtos">
                 <span class="nav-left"><img class="nav-logo is-square" src="/assets/produtos.png" alt="" /><span class="nav-label">Backup</span></span>
-              </button>
-            </div>
-          </div>
-          <div>
-            <div class="nav-sec-title">Mineração</div>
-            <div class="space-y-1">
-              <button type="button" class="nav-item" data-view="supercomissoes">
-                <span class="nav-left"><img class="nav-logo is-square nav-logo--radar" src="/assets/radar.png?v=2" alt="" /><span class="nav-label">Radar de Supercomissões</span></span>
               </button>
             </div>
           </div>
@@ -508,62 +500,6 @@
           <footer class="mt-4 border-t border-slate-200 pt-4 text-center text-xs text-slate-500">
             Shopylitcs · v.1 · <span id="footer-sync">Última sincronização —</span>
           </footer>
-        </section>
-
-        <!-- RADAR DE SUPERCOMISSÕES -->
-        <section id="view-supercomissoes" class="view hidden radar-view space-y-6">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h1 class="text-xl font-bold text-slate-800">Radar de Supercomissões</h1>
-              <p class="text-xs text-slate-500 mt-1">A API identifica bônus de comissão pagos pelos vendedores, acumulando com a comissão Shopee.</p>
-            </div>
-            <span class="radar-scan-pill" id="radar-status">
-              <span class="radar-scan-dot"></span>
-              Sem varredura ainda
-            </span>
-          </div>
-
-          <form id="radar-form" class="radar-filters">
-            <label class="radar-field flex-1 min-w-[200px]">Palavra-chave (opcional)
-              <input type="search" id="radar-keyword" placeholder="Deixe vazio = busca automática" />
-            </label>
-            <label class="radar-field w-48">Comissão total
-              <select id="radar-min">
-                <option value="10">&gt; 10%</option>
-                <option value="15">&gt; 15%</option>
-                <option value="20" selected>&gt; 20%</option>
-                <option value="30">&gt; 30%</option>
-              </select>
-            </label>
-            <button type="submit" class="radar-btn-mine" id="btn-radar-minerar">Minerar</button>
-          </form>
-          <p class="hidden" id="radar-media-pill">Média da lista: —</p>
-
-          <div class="radar-table-wrap">
-            <div class="radar-table-head">
-              <h3 class="radar-table-title">Produtos <span class="count-pill" id="radar-count-pill">0</span></h3>
-              <input type="search" id="radar-filter" class="search max-w-xs" placeholder="Filtrar por produto…" />
-            </div>
-            <div class="radar-table-scroll">
-              <table class="radar-table" id="radar-table">
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Preço</th>
-                    <th class="text-center">Comissão Shopee</th>
-                    <th class="text-center radar-th-bonus">Bônus vendedor</th>
-                    <th class="text-center radar-th-total">Total</th>
-                    <th>Métricas</th>
-                    <th class="text-right">Ações rápidas</th>
-                  </tr>
-                </thead>
-                <tbody id="radar-tbody">
-                  <tr><td colspan="7" class="radar-empty">Clique em Minerar para varrer a Shopee.</td></tr>
-                </tbody>
-              </table>
-              <div id="radar-card-list" class="radar-card-list hidden" role="list" aria-label="Produtos do Radar"></div>
-            </div>
-          </div>
         </section>
 
         <!-- ANÁLISE IA -->
@@ -929,18 +865,23 @@
                       </label>
                       <label>Bônus META 100% (%)
                         <input type="text" id="set-bonus-100" inputmode="decimal" placeholder="1" />
-                        <span class="field-hint">% sobre o faturamento-alvo da faixa 100%</span>
+                        <span class="field-hint">% sobre o faturamento até ontem, se a faixa 100% já foi batida</span>
                       </label>
                       <label>Bônus META 125% (%)
                         <input type="text" id="set-bonus-125" inputmode="decimal" placeholder="2" />
-                        <span class="field-hint">% sobre o faturamento-alvo da faixa 125%</span>
+                        <span class="field-hint">% sobre o faturamento até ontem, se a faixa 125% já foi batida</span>
                       </label>
                       <label>Bônus META 150% (%)
                         <input type="text" id="set-bonus-150" inputmode="decimal" placeholder="3" />
-                        <span class="field-hint">% sobre o faturamento-alvo da faixa 150%</span>
+                        <span class="field-hint">% sobre o faturamento até ontem, se a faixa 150% já foi batida</span>
                       </label>
                     </div>
-                    <p class="hint cfg-formula">Ex.: meta R$ 100.000 → alvo 125% = R$ 125.000 · bônus 2% = R$ 2.500.</p>
+                    <p class="hint cfg-formula">Ex.: meta R$ 100.000 e faturamento até ontem R$ 110.000 → faixa batida 100% · bônus 1% = R$ 1.100 sobre o faturamento.</p>
+                    <label class="cfg-bonus-lucro" for="set-bonus-no-lucro">
+                      <input type="checkbox" id="set-bonus-no-lucro" />
+                      <span>Incluir o bônus batido no lucro líquido</span>
+                    </label>
+                    <span class="field-hint">O mês é sempre o de ontem (dia 19 → 01 a 30). O bônus da faixa já atingida entra no Lucro líquido do dashboard e no lucro de cada SubID da campanha Meta.</span>
                   </div>
                   <div class="form-actions" style="margin-top:1rem">
                     <button type="submit" class="btn primary sm">Salvar metas e bônus</button>
@@ -977,72 +918,44 @@
 
         <!-- BACKUP & CONTINGÊNCIA PRO -->
         <section id="view-data" class="view hidden space-y-5">
-          <div class="bk-page-head">
+          <div class="bk-hero">
             <div>
-              <div class="bk-eyebrow">Shopee / Proteção de ofertas</div>
-              <h1 class="text-2xl font-extrabold text-slate-900" id="data-title">Backup</h1>
-              <p class="text-xs text-slate-500 mt-1" id="data-sub">Gerencie produtos principais, reservas e oportunidades de substituição em um único lugar.</p>
+              <h1 id="data-title"><i class="fa-solid fa-box-archive"></i> Backup &amp; Contingência Pro</h1>
+              <p id="data-sub">Proteja links, garimpo por histórico real e radar de recompra. Preço e comissão atualizam automaticamente 3×/dia (6h, 14h e 22h BRT).</p>
               <div class="bk-status" id="backup-live-status"><span class="bk-dot"></span>Aguardando sincronização</div>
             </div>
-            <div class="bk-head-actions">
-              <button type="button" class="btn ghost sm" data-goto="dashboard">Voltar ao painel</button>
-              <button type="button" class="btn brand sm js-backup-varrer" id="btn-backup-atualizar">
-                <i class="fa-solid fa-arrows-rotate"></i>
-                <span>Atualizar tudo</span>
-              </button>
-            </div>
+            <button type="button" class="bk-hero-btn js-backup-varrer" id="btn-backup-atualizar">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>Varrer todas as ofertas</span>
+            </button>
           </div>
 
           <div id="backup-root" class="bk-pro space-y-4">
-            <section class="bk-summary">
-              <div>
-                <h2>Proteção operacional</h2>
-                <p>O sistema monitora disponibilidade, comissão e desempenho para indicar quando um backup deve assumir o lugar do produto principal.</p>
-              </div>
-              <div class="bk-summary-right">
-                <div class="bk-scan-info" id="backup-scan-info">
-                  <span>Último scan</span>
-                  <strong>—</strong>
-                </div>
-                <button type="button" class="bk-scan-btn js-backup-varrer" id="btn-backup-varrer">
-                  <i class="fa-solid fa-play"></i>
-                  <span>Executar scan</span>
-                </button>
-              </div>
-            </section>
-
             <div class="bk-kpi-grid" id="backup-kpi-grid">
-              <div class="bk-kpi" data-k="backups">
-                <div class="bk-kpi-top"><span class="bk-kpi-label">Backups ativos</span><i class="fa-solid fa-boxes-stacked"></i></div>
-                <strong>—</strong>
-                <em>—</em>
-              </div>
-              <div class="bk-kpi is-good" data-k="cobertura">
-                <div class="bk-kpi-top"><span class="bk-kpi-label">Cobertura da API</span><i class="fa-solid fa-circle-check"></i></div>
-                <strong>—</strong>
-                <em>—</em>
-              </div>
-              <div class="bk-kpi" data-k="sinais">
-                <div class="bk-kpi-top"><span class="bk-kpi-label">Precisam de atenção</span><i class="fa-solid fa-triangle-exclamation"></i></div>
-                <strong>—</strong>
-                <em>—</em>
-              </div>
-              <div class="bk-kpi" data-k="comissao">
-                <div class="bk-kpi-top"><span class="bk-kpi-label">Comissão média</span><i class="fa-solid fa-chart-line"></i></div>
-                <strong>—</strong>
-                <em>—</em>
-              </div>
+              <button type="button" class="bk-kpi" data-k="backups"><span class="bk-kpi-label">Backups</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi" data-k="cobertura"><span class="bk-kpi-label">Cobertura API</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi" data-k="fora"><span class="bk-kpi-label">Fora do afiliado</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi" data-k="sinais"><span class="bk-kpi-label">Sinais críticos</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi" data-k="scan"><span class="bk-kpi-label">Scan mais antigo</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi" data-k="comissao"><span class="bk-kpi-label">Comissão média</span><strong>—</strong><em>—</em></button>
             </div>
+            <div class="bk-kpi-grid bk-kpi-grid--3" id="backup-kpi-row2">
+              <button type="button" class="bk-kpi" data-k="rotacao"><span class="bk-kpi-label">Trocar principal</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi" data-k="variantes"><span class="bk-kpi-label">Variantes com faixa</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi" data-k="loja"><span class="bk-kpi-label">Loja com mais backups</span><strong>—</strong><em>—</em></button>
+            </div>
+            <p class="bk-kpi-foot" id="backup-kpi-foot"></p>
+            <span class="hidden" id="backup-scan-info"><strong>—</strong></span>
 
             <div class="bk-workspace">
             <div class="bk-tabs" id="backup-tabs">
-              <button type="button" class="backup-tab is-active" data-backup-tab="grupos">Grupos <span class="count" data-tab-count="grupos">0</span></button>
-              <button type="button" class="backup-tab" data-backup-tab="listagem">Meus backups <span class="count" data-tab-count="listagem">0</span></button>
-              <button type="button" class="backup-tab" data-backup-tab="cadastrar">Adicionar</button>
-              <button type="button" class="backup-tab" data-backup-tab="garimpo">Descoberta</button>
-              <button type="button" class="backup-tab" data-backup-tab="recompra">Recompra <span class="count" data-tab-count="recompra">0</span></button>
-              <button type="button" class="backup-tab" data-backup-tab="similar">Similares</button>
-              <button type="button" class="backup-tab" data-backup-tab="config">Configurações</button>
+              <button type="button" class="backup-tab is-active" data-backup-tab="grupos"><i class="fa-solid fa-bullseye"></i> Ninhos/Grupos <span class="count" data-tab-count="grupos">0</span></button>
+              <button type="button" class="backup-tab" data-backup-tab="cadastrar"><i class="fa-solid fa-plus"></i> Cadastrar link</button>
+              <button type="button" class="backup-tab" data-backup-tab="listagem"><i class="fa-solid fa-box-archive"></i> Meus Backups <span class="count" data-tab-count="listagem">0</span></button>
+              <button type="button" class="backup-tab" data-backup-tab="garimpo"><i class="fa-solid fa-gem"></i> Garimpo inteligente</button>
+              <button type="button" class="backup-tab" data-backup-tab="recompra"><i class="fa-solid fa-arrows-rotate"></i> Radar de recompra <span class="count" data-tab-count="recompra">0</span></button>
+              <button type="button" class="backup-tab" data-backup-tab="similar"><i class="fa-solid fa-magnifying-glass"></i> Rastrear similares</button>
+              <button type="button" class="backup-tab" data-backup-tab="config"><i class="fa-solid fa-gear"></i> Configurações</button>
             </div>
 
             <div id="backup-tab-grupos" class="bk-tab-panel space-y-4">
@@ -1059,7 +972,7 @@
                 </div>
               </div>
               <div class="bk-section-head">
-                <span class="bk-section-title">Grupos de contingência</span>
+                <span class="bk-section-title">Ninhos / Grupos</span>
                 <span class="bk-section-meta" id="backup-grupos-meta"></span>
               </div>
               <div id="backup-grupos-list" class="space-y-3"></div>
@@ -1128,28 +1041,27 @@
             </div>
 
             <div id="backup-tab-config" class="bk-tab-panel hidden">
-              <div class="bk-settings">
-                <aside class="bk-settings-nav">
-                  <button type="button" class="is-active">Geral</button>
-                </aside>
-                <div class="bk-settings-body">
-                  <h3>Configurações do Backup</h3>
-                  <p>Preferências de operação e visualização. Ficam neste navegador.</p>
-                  <label class="bk-setting">
-                    <span><strong>Abrir Grupos automaticamente</strong><small>Entrar na tela já mostrando os grupos de contingência.</small></span>
-                    <input type="checkbox" id="bk-cfg-default-grupos" checked />
+              <div class="bk-garimpo-cfg">
+                <h3><i class="fa-solid fa-bolt"></i> Robô de Garimpo — ofertas semelhantes</h3>
+                <p>Define a faixa de <b>preço do produto em R$</b> (não comissão) em relação ao principal do grupo. Ofertas fora dessa faixa não aparecem nas sugestões automáticas.</p>
+                <div class="bk-garimpo-sliders">
+                  <label>Até quanto % <b>mais caro</b> que o principal?
+                    <span class="bk-range"><input type="range" id="bk-gar-acima" min="0" max="100" value="15" /><input type="number" id="bk-gar-acima-n" min="0" max="100" value="15" />%</span>
+                    <small>Ex.: 15% → principal R$ 100 aceita até R$ 115</small>
                   </label>
-                  <label class="bk-setting">
-                    <span><strong>Confirmar varredura completa</strong><small>Evita iniciar um scan de todos os produtos por engano.</small></span>
-                    <input type="checkbox" id="bk-cfg-confirm-varrer" checked />
+                  <label>Até quanto % <b>mais barato</b> que o principal?
+                    <span class="bk-range"><input type="range" id="bk-gar-abaixo" min="0" max="100" value="25" /><input type="number" id="bk-gar-abaixo-n" min="0" max="100" value="25" />%</span>
+                    <small>Ex.: 25% → principal R$ 100 aceita a partir de R$ 75</small>
                   </label>
-                  <label class="bk-setting">
-                    <span><strong>Mostrar indicadores no topo</strong><small>Exibe os principais números de operação.</small></span>
-                    <input type="checkbox" id="bk-cfg-show-kpi" checked />
-                  </label>
-                  <button type="button" class="btn brand sm mt-3" id="btn-backup-cfg-save">Salvar preferências</button>
-                  <p class="form-status" id="backup-cfg-status"></p>
                 </div>
+                <div class="bk-garimpo-sim">
+                  <label>Preço do produto principal (R$)
+                    <input type="text" id="bk-gar-exemplo" inputmode="decimal" value="99,90" />
+                  </label>
+                  <p id="bk-gar-faixa">Garimpo aceita ofertas entre — e —</p>
+                </div>
+                <button type="button" class="btn ghost sm" id="btn-backup-cfg-reset">Restaurar padrão</button>
+                <p class="form-status" id="backup-cfg-status"></p>
               </div>
             </div>
             </div>
@@ -1169,9 +1081,9 @@
         <i class="fa-solid fa-bullhorn" aria-hidden="true"></i>
         <span>Campanhas</span>
       </button>
-      <button type="button" class="m-tab" data-m-tab="supercomissoes">
-        <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i>
-        <span>Radar</span>
+      <button type="button" class="m-tab" data-m-tab="produtos">
+        <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+        <span>Backup</span>
       </button>
       <button type="button" class="m-tab" data-m-tab="analise-ia">
         <i class="fa-solid fa-brain" aria-hidden="true"></i>
@@ -1244,12 +1156,6 @@
         <button type="button" class="m-sheet__item" data-m-view="produtos">
           <img class="is-square" src="/assets/produtos.png" alt="" width="22" height="22" />
           <span>Backup</span>
-        </button>
-
-        <div class="m-sheet__sec">Mineração</div>
-        <button type="button" class="m-sheet__item" data-m-view="supercomissoes">
-          <img class="is-square" src="/assets/radar.png?v=2" alt="" width="22" height="22" />
-          <span>Radar de Supercomissões</span>
         </button>
 
         <div class="m-sheet__sec">Inteligência</div>
@@ -1350,6 +1256,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=subid-abat-29"></script>
+  <script src="/app.js?v=bonus-1"></script>
 </body>
 </html>

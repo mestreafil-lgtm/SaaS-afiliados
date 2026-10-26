@@ -470,6 +470,24 @@ html.dark .channel-kpi-alert-close {
   background: linear-gradient(120deg, rgba(14,165,233,.2), rgba(16,185,129,.12) 55%, transparent);
 }
 .meta-proj-head-main { min-width: 0; flex: 1; }
+.meta-bonus-hit {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #ecfeff;
+}
+.meta-bonus-hit b { color: #fde68a; }
+.cfg-bonus-lucro {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f172a;
+  cursor: pointer;
+}
+.cfg-bonus-lucro input { width: 1rem; height: 1rem; accent-color: #0f766e; }
 .meta-proj-title-row {
   display: flex;
   flex-wrap: wrap;

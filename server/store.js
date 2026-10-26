@@ -798,8 +798,8 @@ function daysAgoISO(n) {
 }
 
 async function loadFaturamentoMtd(userId = requireUserId()) {
-  const start = monthStartISO();
   const end = shopeeEndDate();
+  const start = brtFirstDayOfMonth(end);
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("daily_metrics")
@@ -924,6 +924,7 @@ async function loadSettings(userId = requireUserId()) {
       metaBonus100: data?.meta_bonus_100 != null ? Number(data.meta_bonus_100) : 1,
       metaBonus125: data?.meta_bonus_125 != null ? Number(data.meta_bonus_125) : 2,
       metaBonus150: data?.meta_bonus_150 != null ? Number(data.meta_bonus_150) : 3,
+      metaBonusNoLucro: Boolean(data?.meta_bonus_no_lucro),
       taxRate,
       metaTaxRate,
       teamName: data?.team_name || "Minha conta",
@@ -941,6 +942,7 @@ function settingsFromRow(userId, core, extras) {
     metaBonus100: data.meta_bonus_100 != null ? Number(data.meta_bonus_100) : 1,
     metaBonus125: data.meta_bonus_125 != null ? Number(data.meta_bonus_125) : 2,
     metaBonus150: data.meta_bonus_150 != null ? Number(data.meta_bonus_150) : 3,
+    metaBonusNoLucro: Boolean(data.meta_bonus_no_lucro),
     taxRate: data.tax_rate != null ? Number(data.tax_rate) : 11.7,
     metaTaxRate: data.meta_tax_rate != null ? Number(data.meta_tax_rate) : 12,
     teamName: data.team_name || "Minha conta",
@@ -969,6 +971,7 @@ async function saveSettings(partial, userId = requireUserId()) {
   if (partial.metaBonus100 != null) extras.meta_bonus_100 = Number(partial.metaBonus100);
   if (partial.metaBonus125 != null) extras.meta_bonus_125 = Number(partial.metaBonus125);
   if (partial.metaBonus150 != null) extras.meta_bonus_150 = Number(partial.metaBonus150);
+  if (partial.metaBonusNoLucro != null) extras.meta_bonus_no_lucro = Boolean(partial.metaBonusNoLucro);
 
   const supabase = getSupabase();
   const { ensureConfigSchema, upsertAppSettingsSql } = require("./ensureDb");

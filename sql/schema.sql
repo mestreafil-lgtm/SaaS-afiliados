@@ -43,6 +43,7 @@ create table if not exists app_settings (
   meta_bonus_100 numeric null default 1,
   meta_bonus_125 numeric null default 2,
   meta_bonus_150 numeric null default 3,
+  meta_bonus_no_lucro boolean not null default false,
   team_name text not null default 'Minha conta',
   team_plan text not null default 'Shopee · Meta',
   claude_api_key text not null default '',

@@ -114,6 +114,46 @@ function toComissaoPct(rate) {
   return Math.round(pct * 100) / 100;
 }
 
+const imagemCache = new Map();
+
+async function imagemOferta(itemId) {
+  const id = String(itemId || "").replace(/\D/g, "");
+  if (!id) return "";
+  if (imagemCache.has(id)) return imagemCache.get(id);
+  try {
+    const query = `{
+      productOfferV2(itemId: ${Number(id)}) {
+        nodes { imageUrl itemId }
+      }
+    }`;
+    const data = await shopeeGraphql(query);
+    const url = String(data?.productOfferV2?.nodes?.[0]?.imageUrl || "").trim();
+    imagemCache.set(id, url);
+    return url;
+  } catch (_) {
+    imagemCache.set(id, "");
+    return "";
+  }
+}
+
+async function hidratarImagens(lista) {
+  const alvos = (lista || []).filter((p) => p && !p.imagem && p.itemId).slice(0, 36);
+  if (!alvos.length) return;
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < alvos.length) {
+      const item = alvos[cursor];
+      cursor += 1;
+      item.imagem = await imagemOferta(item.itemId);
+    }
+  };
+  const n = Math.min(5, alvos.length);
+  await Promise.race([
+    Promise.all(Array.from({ length: n }, () => worker())),
+    new Promise((resolve) => setTimeout(resolve, 12000)),
+  ]);
+}
+
 function normalizeShopeeProduct(node) {
   const preco = Number(node.price || node.priceMin || 0);
   const comissaoShopee = toComissaoPct(node.shopeeCommissionRate);
@@ -1217,11 +1257,15 @@ async function getGarimpoLocal(limit = 80, userId = requireUserId()) {
   jaVendo.sort((a, b) => Number(b.score_oportunidade || 0) - Number(a.score_oportunidade || 0));
   descoberta.sort((a, b) => Number(b.score_oportunidade || 0) - Number(a.score_oportunidade || 0));
 
+  const ja = jaVendo.slice(0, limit);
+  const desc = descoberta.slice(0, Math.min(40, limit));
+  await hidratarImagens([...ja, ...desc]);
+
   return {
     data: new Date().toISOString().slice(0, 10),
     fonte: "api+products",
-    jaVendo: jaVendo.slice(0, limit),
-    descoberta: descoberta.slice(0, Math.min(40, limit)),
+    jaVendo: ja,
+    descoberta: desc,
   };
 }
 
@@ -1264,6 +1308,57 @@ async function getRadarRecompra(limit = 40, userId = requireUserId()) {
   };
 }
 
+function parseMoneyGarimpo(raw) {
+  let s = String(raw || "").replace(/[^\d,.-]/g, "");
+  if (s.includes(",") && s.includes(".")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (s.includes(",")) s = s.replace(",", ".");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function termoGarimpo(nome, apelido) {
+  const stop = new Set(["de", "da", "do", "das", "dos", "e", "com", "para", "kit", "original", "shopee"]);
+  const fonte = String(apelido || nome || "").trim();
+  const tokens = fonte
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !stop.has(w));
+  return tokens.slice(0, 3).join(" ") || String(nome || "").trim().slice(0, 60);
+}
+
+async function garimpoContextual(body = {}, userId = requireUserId()) {
+  const termo = termoGarimpo(body.nome, body.apelido);
+  if (!termo) return { ofertas: [], termoUsado: "" };
+  const acima = Math.min(100, Math.max(0, Number(body.precoToleranciaAcimaPct ?? 15)));
+  const abaixo = Math.min(100, Math.max(0, Number(body.precoToleranciaAbaixoPct ?? 25)));
+  const preco = parseMoneyGarimpo(body.preco);
+  const min = preco > 0 ? preco * (1 - abaixo / 100) : 0;
+  const max = preco > 0 ? preco * (1 + acima / 100) : Infinity;
+  const exclude = new Set((body.excludeItemIds || []).map(String));
+  const shopId = body.shopId ? String(body.shopId) : null;
+  let pack = await queryProductOffersByKeyword(termo, { shopId, limit: 20, sortType: 2 });
+  let nodes = pack.nodes || [];
+  let fonte = shopId ? "loja" : "geral";
+  if (!nodes.length && shopId) {
+    pack = await queryProductOffersByKeyword(termo, { limit: 20, sortType: 2 });
+    nodes = pack.nodes || [];
+    fonte = "geral";
+  }
+  const ofertas = nodes
+    .map(normalizeShopeeProduct)
+    .filter((p) => p.itemId && !exclude.has(String(p.itemId)))
+    .filter((p) => {
+      const v = Number(p.precoMin || p.preco || 0);
+      if (!(preco > 0)) return true;
+      return v >= min && v <= max;
+    })
+    .slice(0, 5);
+  return { ofertas, termoUsado: termo, fonte };
+}
+
 module.exports = {
   lookupProduto,
   searchProdutosApi,
@@ -1286,6 +1381,7 @@ module.exports = {
   getBackupDashboardStats,
   getGarimpoLocal,
   getRadarRecompra,
+  garimpoContextual,
   analisarInsightGrupo,
   generateAffiliateShortLink,
   parseShopeeUrl,

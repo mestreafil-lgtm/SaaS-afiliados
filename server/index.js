@@ -60,6 +60,7 @@ const {
   searchProdutosApi,
   generateAffiliateShortLink,
   radarSupercomissoes,
+  garimpoContextual,
 } = require("./backup");
 const { runAutoSync, cronAuthorized, startLocalAutoSync } = require("./autoSync");
 const { saveSubscription, getPublicKey } = require("./pushNotify");
@@ -1002,6 +1003,17 @@ async function requestHandler(req, res) {
               shopId: body.shopId || null,
               limit: Number(body.limit) || 20,
             });
+            sendJson(res, 200, { success: true, ...result });
+          } catch (err) {
+            sendJson(res, 400, { success: false, error: err.message });
+          }
+          return;
+        }
+
+        if (pathname === "/api/backup/garimpo-contextual" && req.method === "POST") {
+          const body = await readBody(req);
+          try {
+            const result = await garimpoContextual(body || {});
             sendJson(res, 200, { success: true, ...result });
           } catch (err) {
             sendJson(res, 400, { success: false, error: err.message });
