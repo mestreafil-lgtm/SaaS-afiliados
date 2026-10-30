@@ -603,7 +603,7 @@ async function enrichDashboardWithAds(dash, userId = requireUserId(), { persistS
   kpis.unpaid = subIdsAll.reduce((a, r) => a + Number(r.unpaid || 0), 0);
   kpis.pedidos = kpis.concluidos + kpis.pendentes;
   kpis.cliques_shopee = subIdsAll.reduce((a, r) => a + Number(r.cliques_shopee || 0), 0);
-  const kpisAligned = calcLucroRoi(kpis.comissao, kpis.inv_meta, kpis.inv_pin, tax);
+  const kpisAligned = calcLucroRoi(kpis.comissao, invMeta, invPin, tax);
   Object.assign(kpis, kpisAligned);
   kpis.abatimento = commAbatPct(kpis.faturamento, kpis.comissao) ?? 0;
   // Mantém abatimento com numerador só de canais pagos (já calculado acima)

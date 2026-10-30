@@ -1,7 +1,7 @@
 "use strict";
 
 const { getSupabase } = require("./supabase");
-const { requireUserId, requestCached } = require("./auth");
+const { requireUserId, requestCached, invalidateRequestCache } = require("./auth");
 const { brtTodayISO, brtFirstDayOfMonth, shopeeEndDate, brtSubtractDays } = require("./brtDates");
 const { normalizeShopeeSubId } = require("./normalizeSubId");
 
@@ -951,18 +951,24 @@ function settingsFromRow(userId, core, extras) {
   };
 }
 
+function clampPct(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(100, Math.max(0, Math.round(n * 100) / 100));
+}
+
 async function saveSettings(partial, userId = requireUserId()) {
   const prev = await loadSettings(userId);
   const core = {
     user_id: userId,
     meta_base: partial.metaBase != null ? Number(partial.metaBase) : prev.metaBase,
-    tax_rate: partial.taxRate != null ? Number(partial.taxRate) : prev.taxRate,
+    tax_rate: partial.taxRate != null ? clampPct(partial.taxRate, prev.taxRate) : prev.taxRate,
     team_name: partial.teamName != null ? String(partial.teamName) : prev.teamName,
     team_plan: partial.teamPlan != null ? String(partial.teamPlan) : prev.teamPlan,
     updated_at: new Date().toISOString(),
   };
   const extras = {};
-  if (partial.metaTaxRate != null) extras.meta_tax_rate = Number(partial.metaTaxRate);
+  if (partial.metaTaxRate != null) extras.meta_tax_rate = clampPct(partial.metaTaxRate, prev.metaTaxRate);
   if (partial.metaDias !== undefined) {
     extras.meta_dias = partial.metaDias == null || partial.metaDias === ""
       ? null
@@ -1001,6 +1007,7 @@ async function saveSettings(partial, userId = requireUserId()) {
     }
   }
 
+  invalidateRequestCache(`loadSettings:${userId}`);
   try {
     return await loadSettings(userId);
   } catch (_) {

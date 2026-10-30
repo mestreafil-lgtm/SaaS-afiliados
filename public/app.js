@@ -837,6 +837,8 @@
     subidSort: { key: "comissao", dir: "desc" },
     /** Qual status sobe pro topo: teste → desativada → ativa (ciclo no header Status). */
     statusPin: "ativa",
+    /** Só agrupa por status depois que o cliente clica na coluna Status. */
+    groupByStatus: false,
     subidProfitFilter: null,
     opsSort: { key: "status", dir: "asc" },
     dailySort: { key: "data", dir: "desc" },
@@ -876,38 +878,53 @@
     return `${sign}R$${Math.round(abs).toLocaleString("pt-BR")}`;
   }
 
-  /** Invest usado no ROI (Meta com imposto + Pin), alinhado ao painel de referência. */
+  /** Imposto da comissão e taxa Meta usados agora (o que está em Configurações). */
+  function currentTaxRates() {
+    return {
+      gov: Number(state.settings.taxRate != null ? state.settings.taxRate : 11.7) / 100,
+      meta: Number(state.settings.metaTaxRate != null ? state.settings.metaTaxRate : 12) / 100,
+    };
+  }
+
+  /** Invest usado no ROI: gasto Meta × (1 + taxa) + Pin. Sempre a taxa atual, uma vez só. */
   function investForRoi(r) {
     if (!r) return 0;
     const invMeta = Number(r.inv_meta || 0);
     const invPin = Number(r.inv_pin || 0);
-    const invTotal = Number(r.inv_total || 0);
-    if (r.inv_meta_taxed != null && Number.isFinite(Number(r.inv_meta_taxed))) {
-      return Number(r.inv_meta_taxed) + invPin;
-    }
     if (invMeta > 0 || invPin > 0) {
-      const metaTax = Number(state.settings.metaTaxRate != null ? state.settings.metaTaxRate : 12) / 100;
-      return invMeta * (1 + metaTax) + invPin;
+      return invMeta * (1 + currentTaxRates().meta) + invPin;
     }
-    return invTotal;
+    return Number(r.inv_total || 0);
+  }
+
+  function lucroAntesBonus(r) {
+    const gov = currentTaxRates().gov;
+    return Number(r?.comissao || 0) * (1 - gov) - investForRoi(r);
   }
 
   function displayRoi(r) {
     if (!r) return null;
-    const share = bonusShareOf(r);
     const inv = investForRoi(r);
-    if (share) {
-      if (inv <= 0) return null;
-      const base = r.lucro != null ? Number(r.lucro) : Number(r.comissao || 0) - inv;
-      return ((base + share) / inv) * 100;
-    }
-    if (r.roi != null && Number.isFinite(Number(r.roi))) return Number(r.roi);
     if (inv <= 0) return null;
-    const gov = Number(state.settings.taxRate || 0) / 100;
-    const lucro = r.lucro != null
-      ? Number(r.lucro)
-      : Number(r.comissao || 0) * (1 - gov) - inv;
-    return (lucro / inv) * 100;
+    return ((lucroAntesBonus(r) + bonusShareOf(r)) / inv) * 100;
+  }
+
+  function applyTaxToKpis(k) {
+    if (!k) return k;
+    const { gov, meta } = currentTaxRates();
+    const invMeta = Number(k.inv_meta || 0);
+    const invPin = Number(k.inv_pin || 0);
+    const invMetaTaxed = invMeta * (1 + meta);
+    const invForRoi = invMetaTaxed + invPin;
+    const lucro = Math.round((Number(k.comissao || 0) * (1 - gov) - invForRoi) * 100) / 100;
+    const roi = invForRoi > 0 ? Math.round((lucro / invForRoi) * 10000) / 100 : null;
+    return {
+      ...k,
+      inv_meta_taxed: Math.round(invMetaTaxed * 100) / 100,
+      inv_total: Math.round(invForRoi * 100) / 100,
+      lucro,
+      roi,
+    };
   }
 
   function roiClass(roi) {
@@ -1343,7 +1360,7 @@
       ? Number(k.inv_meta_taxed != null ? k.inv_meta_taxed : invMeta || 0)
       : null;
     const metaHasTax = hasData && invMeta > 0 && invMetaTaxed > invMeta + 0.005;
-    const kLucro = hasData ? withBonusLucro(k, "geral") : k;
+    const kLucro = hasData ? withBonusLucro(applyTaxToKpis(k), "geral") : k;
     const lucro = !hasData ? null : (kLucro.lucro != null ? Number(kLucro.lucro) : Number(k.comissao || 0) - Number(invTotal || 0));
     const roi = hasData ? kLucro.roi : null;
     const hasRoi = hasData && invTotal > 0 && Number.isFinite(Number(roi));
@@ -2693,6 +2710,11 @@
 
   /** Ciclo: Ativa → Em teste no topo → Desativada no topo → Ativa… */
   function cycleStatusPin() {
+    if (!state.groupByStatus) {
+      state.groupByStatus = true;
+      state.statusPin = "ativa";
+      return state.statusPin;
+    }
     const order = ["teste", "desativada", "ativa"];
     const cur = normalizeStatus(state.statusPin || "ativa");
     const i = order.indexOf(cur);
@@ -2704,11 +2726,14 @@
     if (!rows?.length) return rows || [];
     const get = getter || ((r) => r[key]);
     const statusRank = statusPinRank();
-    // 1º o grupo pinado no topo; 2º o critério da coluna (desc = maior primeiro).
+    const group = state.groupByStatus === true;
+    // Sem agrupar, a linha fica onde a métrica colocou (desativar não joga pra longe).
     return [...rows].sort((a, b) => {
-      const ra = statusRank[normalizeStatus(a.status)] ?? 9;
-      const rb = statusRank[normalizeStatus(b.status)] ?? 9;
-      if (ra !== rb) return ra - rb;
+      if (group) {
+        const ra = statusRank[normalizeStatus(a.status)] ?? 9;
+        const rb = statusRank[normalizeStatus(b.status)] ?? 9;
+        if (ra !== rb) return ra - rb;
+      }
       if (!key || key === "status") {
         return String(a.subid || "").localeCompare(String(b.subid || ""), "pt-BR", {
           sensitivity: "base",
@@ -2754,12 +2779,14 @@
       th.classList.toggle("asc", active && sortState.dir === "asc");
       th.classList.toggle("desc", active && sortState.dir === "desc");
       if (key === "status") {
-        th.classList.add("th-status-pin");
-        th.classList.toggle("pin-teste", pin === "teste");
-        th.classList.toggle("pin-desativada", pin === "desativada");
-        th.classList.toggle("pin-ativa", pin === "ativa");
+        th.classList.toggle("th-status-pin", state.groupByStatus === true);
+        th.classList.toggle("pin-teste", state.groupByStatus && pin === "teste");
+        th.classList.toggle("pin-desativada", state.groupByStatus && pin === "desativada");
+        th.classList.toggle("pin-ativa", state.groupByStatus && pin === "ativa");
         const next = pin === "ativa" ? "Em teste" : pin === "teste" ? "Desativada" : "Ativa";
-        th.title = `${statusLabel(pin)} no topo · clique → ${next} sobe`;
+        th.title = state.groupByStatus
+          ? `${statusLabel(pin)} no topo · clique → ${next} sobe`
+          : "Clique para agrupar. Desativada vai para o fim; sem agrupar, fica onde está.";
         th.setAttribute("aria-sort", "other");
       } else {
         th.classList.remove("th-status-pin", "pin-teste", "pin-desativada", "pin-ativa");
@@ -2801,9 +2828,7 @@
       if (state.dailySort.key === "abatimento_cliques_pin") {
         return d.abatimento_cliques_pin != null ? Number(d.abatimento_cliques_pin) : null;
       }
-      if (state.dailySort.key === "lucro") {
-        return d.lucro != null ? d.lucro : Number(d.comissao || 0) - Number(d.inv_total || 0);
-      }
+      if (state.dailySort.key === "lucro") return lucroAntesBonus(d);
       return d[state.dailySort.key];
     });
     // Dias não têm status de campanha — sortRows acima ainda funciona (todos "ativa").
@@ -2825,14 +2850,12 @@
         const fat = Number(d.faturamento || 0);
         const com = Number(d.comissao || 0);
         const abatMeta = d.abatimento_cliques_meta != null ? Number(d.abatimento_cliques_meta) : null;
-        const lucro = isTotal
-          ? d.lucro
-          : (d.lucro != null ? d.lucro : com - Number(d.inv_total || 0));
+        const lucro = isTotal ? lucroAntesBonus(k) : lucroAntesBonus(d);
         const dayLabel = isTotal ? "TOTAL" : escapeHtml(shortDay(d.data));
         return `<article class="daily-card${isTotal ? " daily-card--total" : ""}" role="listitem">
           <header class="daily-card-head">
             <span class="daily-card-day">${dayLabel}</span>
-            <span class="daily-card-roi ${roiTierClass(d.roi)}">${fmtPct(d.roi)}</span>
+            <span class="daily-card-roi ${roiTierClass(displayRoi(d))}">${fmtPct(displayRoi(d))}</span>
           </header>
           <div class="daily-card-essentials">
             <div class="daily-card-essential"><span class="lab">Comissão</span><span class="val cell-emerald">${fmt(com)}</span></div>
@@ -2844,7 +2867,7 @@
             <div class="daily-card-grid">
               <div class="daily-card-cell"><span class="lab">Inv. Meta</span><span class="val cell-gasto">${fmt(d.inv_meta)}</span></div>
               <div class="daily-card-cell"><span class="lab">Inv. Pin</span><span class="val cell-gasto">${fmt(d.inv_pin)}</span></div>
-              <div class="daily-card-cell"><span class="lab">Inv. Total</span><span class="val cell-gasto">${fmt(d.inv_total)}</span></div>
+              <div class="daily-card-cell"><span class="lab">Inv. Total</span><span class="val cell-gasto">${fmt(investForRoi(d))}</span></div>
               <div class="daily-card-cell"><span class="lab">Abat. Meta</span><span class="val ${abatCliquesClass(abatMeta)}">${fmtPct(abatMeta)}</span></div>
             </div>
           </details>
@@ -2885,31 +2908,34 @@
       const fat = Number(d.faturamento || 0);
       const com = Number(d.comissao || 0);
       const abatMeta = d.abatimento_cliques_meta != null ? Number(d.abatimento_cliques_meta) : null;
-      const lucro = d.lucro != null ? d.lucro : com - Number(d.inv_total || 0);
+      const inv = investForRoi(d);
+      const lucro = lucroAntesBonus(d);
+      const roi = displayRoi(d);
       return `<tr>
         <td class="font-medium subid">${shortDay(d.data)}</td>
         <td class="num cell-emerald">${fmt(fat)}</td>
         <td class="num cell-emerald">${fmt(com)}</td>
         <td class="num cell-gasto">${fmt(d.inv_meta)}</td>
         <td class="num cell-gasto">${fmt(d.inv_pin)}</td>
-        <td class="num cell-gasto">${fmt(d.inv_total)}</td>
+        <td class="num cell-gasto">${fmt(inv)}</td>
         <td class="num ${lucroCellClass(lucro)}">${fmt(lucro)}</td>
-        <td class="num ${roiTierClass(d.roi)}">${fmtPct(d.roi)}</td>
+        <td class="num ${roiTierClass(roi)}">${fmtPct(roi)}</td>
         <td class="num ${abatCliquesClass(abatMeta)}">${fmtPct(abatMeta)}</td>
       </tr>`;
     }).join("") || `<tr><td colspan="9">Sem dias no período.</td></tr>`;
 
     if (state.dailyRows.length) {
       const totAbatMeta = k.abatimento_cliques_meta != null ? Number(k.abatimento_cliques_meta) : null;
+      const tot = applyTaxToKpis(k);
       $("#daily-tfoot").innerHTML = `<tr>
         <td class="subid uppercase tracking-wider">TOTAL</td>
         <td class="num cell-emerald">${fmt(k.faturamento)}</td>
         <td class="num cell-emerald">${fmt(k.comissao)}</td>
         <td class="num cell-gasto">${fmt(k.inv_meta)}</td>
         <td class="num cell-gasto">${fmt(k.inv_pin)}</td>
-        <td class="num cell-gasto">${fmt(k.inv_total)}</td>
-        <td class="num ${lucroCellClass(k.lucro)}">${fmt(k.lucro)}</td>
-        <td class="num ${roiTierClass(k.roi)}">${fmtPct(k.roi)}</td>
+        <td class="num cell-gasto">${fmt(tot.inv_total)}</td>
+        <td class="num ${lucroCellClass(tot.lucro)}">${fmt(tot.lucro)}</td>
+        <td class="num ${roiTierClass(tot.roi)}">${fmtPct(tot.roi)}</td>
         <td class="num ${abatCliquesClass(totAbatMeta)}">${fmtPct(totAbatMeta)}</td>
       </tr>`;
     } else $("#daily-tfoot").innerHTML = "";
@@ -2924,8 +2950,9 @@
   }
 
   function normalizeStatus(s) {
-    if (s === "pausada") return "desativada";
-    if (s === "teste" || s === "desativada") return s;
+    const v = String(s || "").trim().toLowerCase();
+    if (v === "pausada" || v === "desativada" || v === "desativado") return "desativada";
+    if (v === "teste") return "teste";
     return "ativa";
   }
 
@@ -3190,8 +3217,8 @@
     const cpc_meta = cliquesMeta > 0 ? Math.round((spendMeta / cliquesMeta) * 100) / 100 : null;
     const ctr_meta = impressoes > 0 ? Math.round((cliquesMeta / impressoes) * 10000) / 100 : null;
     const tax = {
-      taxRate: Number(state.dash?.tax?.taxRate ?? state.settings.taxRate ?? 0),
-      metaTaxRate: Number(state.dash?.tax?.metaTaxRate ?? state.settings.metaTaxRate ?? 12),
+      taxRate: Number(state.settings.taxRate != null ? state.settings.taxRate : 11.7),
+      metaTaxRate: Number(state.settings.metaTaxRate != null ? state.settings.metaTaxRate : 12),
     };
     const gov = Number(tax.taxRate || 0) / 100;
     const metaTax = Number(tax.metaTaxRate != null ? tax.metaTaxRate : 12) / 100;
@@ -3805,8 +3832,6 @@
   }
 
   function channelKpisFor(ch, dash, channelSubs) {
-    const fromServer = dash?.channelKpis?.[ch];
-    if (fromServer && fromServer.faturamento != null) return fromServer;
     return kpisFromSubIds(channelSubs, dash?.kpis);
   }
 
@@ -4396,13 +4421,7 @@
     // Padroniza: lucro sempre líquido (comissao_liq − inv_total). Se o server
     // enviou d.lucro, usa. Caso contrário aplica taxRate/metaTaxRate como no
     // resto do sistema (calcLucroRoi) em vez de subtrair comissão bruta.
-    const taxRate = Number(state.dash?.tax?.taxRate ?? state.settings?.taxRate ?? 0) / 100;
-    const netLucro = (d) => {
-      if (d.lucro != null) return Number(d.lucro);
-      const inv = investForRoi(d);
-      const comLiq = Number(d.comissao || 0) * (1 - taxRate);
-      return comLiq - inv;
-    };
+    const netLucro = (d) => lucroAntesBonus(d);
     const totInv = days.reduce((a, d) => a + investForRoi(d), 0);
     const totLucro = days.reduce((a, d) => a + netLucro(d), 0);
     const totRoi = totInv > 0 ? (totLucro / totInv) * 100 : null;
@@ -4510,8 +4529,7 @@
 
   function subidLucroValue(r) {
     if (!r) return 0;
-    const base = r.lucro != null ? Number(r.lucro) : Number(r.comissao || 0) - investForRoi(r);
-    return Math.round((base + bonusShareOf(r)) * 100) / 100;
+    return Math.round((lucroAntesBonus(r) + bonusShareOf(r)) * 100) / 100;
   }
 
   function paintSubidFilterBar() {
@@ -4901,7 +4919,7 @@
     }
     const rows = days.map((d) => {
       const inv = investForRoi(d);
-      const lucro = d.lucro != null ? Number(d.lucro) : Number(d.comissao || 0) - inv;
+      const lucro = lucroAntesBonus(d);
       const roi = displayRoi(d);
       const label = dayLabelMobile(d.data || d.date || d.dia);
       const labelFull = shortDayLabel(d.data || d.date || d.dia);
@@ -4920,7 +4938,7 @@
     }).join("");
     const totCom = days.reduce((a, d) => a + Number(d.comissao || 0), 0);
     const totInv = days.reduce((a, d) => a + investForRoi(d), 0);
-    const totLucro = days.reduce((a, d) => a + (d.lucro != null ? Number(d.lucro) : Number(d.comissao || 0) - investForRoi(d)), 0);
+    const totLucro = days.reduce((a, d) => a + lucroAntesBonus(d), 0);
     const totRoi = totInv > 0 ? (totLucro / totInv) * 100 : null;
     return `<div class="subid-card-history">
       <div class="subid-card-history-title">Histórico diário · ${days.length} dia(s)</div>
@@ -5235,7 +5253,7 @@
             { label: "Base (comissão)", value: fmt(k.comissao) },
             { label: "Imposto estimado", value: fmt(imposto) },
             { label: "Líquido após imposto", value: fmt(Number(k.comissao || 0) - imposto) },
-            { label: "Lucro após imposto", value: fmt(Number(k.lucro || 0) - imposto) },
+            { label: "Lucro líquido", value: fmt(applyTaxToKpis(k).lucro) },
           ],
         );
         $("#data-sub").textContent = `Alíquota ${fmtPct(tax)} · imposto ${fmt(imposto)}`;
@@ -6157,6 +6175,11 @@
     });
 
     $("#settings-form-taxes")?.addEventListener("submit", (e) => saveSettingsFromForms(e, "taxes"));
+    $("#btn-tax-reset")?.addEventListener("click", () => {
+      if ($("#set-tax")) $("#set-tax").value = formatBrPctInput(11.7);
+      if ($("#set-meta-tax")) $("#set-meta-tax").value = formatBrPctInput(12);
+      saveSettingsFromForms(null, "taxes");
+    });
     $("#settings-form-metas")?.addEventListener("submit", (e) => saveSettingsFromForms(e, "metas"));
     [
       "set-tax", "set-meta-tax", "set-team-name", "set-team-plan",
@@ -6166,6 +6189,7 @@
       if (!inp) return;
       inp.readOnly = false;
       inp.disabled = false;
+      if (id === "set-tax" || id === "set-meta-tax") return;
       inp.addEventListener("change", () => {
         const part = id.startsWith("set-bonus") || id === "set-meta-base" || id === "set-meta-dias" || id === "set-bonus-no-lucro" ? "metas" : "taxes";
         saveSettingsFromForms(null, part);
@@ -6217,8 +6241,8 @@
   function readSettingsFromForms() {
     const metaDiasRaw = ($("#set-meta-dias")?.value || "").trim();
     return {
-      taxRate: parseBrNumber($("#set-tax")?.value || String(state.settings.taxRate || 11.7)),
-      metaTaxRate: parseBrNumber($("#set-meta-tax")?.value || String(state.settings.metaTaxRate || 12)),
+      taxRate: Math.min(100, Math.max(0, parseBrNumber($("#set-tax")?.value || String(state.settings.taxRate || 11.7)))),
+      metaTaxRate: Math.min(100, Math.max(0, parseBrNumber($("#set-meta-tax")?.value || String(state.settings.metaTaxRate || 12)))),
       metaBase: parseBrNumber($("#set-meta-base")?.value || String(state.settings.metaBase || 0)),
       metaDias: metaDiasRaw === "" ? null : Math.max(1, Math.min(31, parseInt(metaDiasRaw, 10) || 0)) || null,
       metaBonus100: parseBrNumber($("#set-bonus-100")?.value || String(state.settings.metaBonus100 ?? 1)),
@@ -6272,8 +6296,8 @@
         body: JSON.stringify(payload),
       });
       state.settings = {
-        taxRate: s.taxRate != null ? Number(s.taxRate) : (payload.taxRate != null ? payload.taxRate : state.settings.taxRate),
-        metaTaxRate: s.metaTaxRate != null ? Number(s.metaTaxRate) : (payload.metaTaxRate != null ? payload.metaTaxRate : state.settings.metaTaxRate),
+        taxRate: part === "taxes" ? all.taxRate : (s.taxRate != null ? Number(s.taxRate) : state.settings.taxRate),
+        metaTaxRate: part === "taxes" ? all.metaTaxRate : (s.metaTaxRate != null ? Number(s.metaTaxRate) : state.settings.metaTaxRate),
         metaBase: s.metaBase != null ? Number(s.metaBase) : (payload.metaBase != null ? payload.metaBase : state.settings.metaBase),
         metaDias: s.metaDias !== undefined && s.metaDias !== null ? Number(s.metaDias) : (part === "metas" ? all.metaDias : state.settings.metaDias),
         metaBonus100: s.metaBonus100 != null ? Number(s.metaBonus100) : (payload.metaBonus100 != null ? payload.metaBonus100 : state.settings.metaBonus100),
