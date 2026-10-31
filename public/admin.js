@@ -104,10 +104,27 @@
     $("#admin-auth").classList.remove("hidden");
     $("#admin-app").classList.add("hidden");
   }
+  function initials(email) {
+    const s = String(email || "AD").replace(/[^a-z0-9]/gi, "");
+    return (s.slice(0, 2) || "AD").toUpperCase();
+  }
+
   function showApp(user) {
     $("#admin-auth").classList.add("hidden");
     $("#admin-app").classList.remove("hidden");
-    $("#admin-user-label").textContent = user?.email || "Admin";
+    const email = user?.email || "Admin";
+    $("#admin-user-label").textContent = email;
+    const avatar = $("#admin-avatar");
+    if (avatar) avatar.textContent = initials(email);
+  }
+
+  function setSidebarOpen(open) {
+    document.body.classList.toggle("sidebar-open", !!open);
+    const backdrop = $("#sidebar-backdrop");
+    if (backdrop) {
+      backdrop.classList.toggle("hidden", !open);
+      backdrop.hidden = !open;
+    }
   }
 
   function setPanel(name) {
@@ -116,9 +133,9 @@
     $$(".panel-block").forEach((p) => p.classList.add("hidden"));
     $(`#panel-${name}`)?.classList.remove("hidden");
     const titles = {
-      overview: ["Gestão", "Resumo", "Visão operacional das contas do sistema."],
-      pending: ["Acessos", "Pendentes", "Cadastros aguardando liberação."],
-      users: ["Contas", "Usuários", "Busque, filtre e gerencie cada conta."],
+      overview: ["Admin", "Resumo", "Contas, fila de aprovação e últimos acessos."],
+      pending: ["Admin", "Pendentes", "Cadastros aguardando liberação."],
+      users: ["Admin", "Usuários", "Busca, filtro e status de cada conta."],
     };
     const t = titles[name] || ["Admin", name, ""];
     $("#panel-eyebrow").textContent = t[0];
@@ -373,6 +390,7 @@
       if (me.user?.role !== "admin" && me.user?.profile?.role !== "admin") {
         clearSession();
         showAuth();
+        $("#admin-login-status").className = "form-status is-err";
         $("#admin-login-status").textContent = "Esta conta não é administradora.";
         return;
       }
@@ -388,6 +406,7 @@
     $("#admin-login").addEventListener("submit", async (e) => {
       e.preventDefault();
       const status = $("#admin-login-status");
+      status.className = "form-status";
       status.textContent = "Entrando…";
       try {
         const r = await api("/api/auth/login", {
@@ -405,6 +424,7 @@
         status.textContent = "";
         await refresh();
       } catch (err) {
+        status.classList.add("is-err");
         status.textContent = err.message;
       }
     });
@@ -429,7 +449,13 @@
       renderUsers();
     });
 
-    $$(".rail-item").forEach((b) => b.addEventListener("click", () => setPanel(b.dataset.panel)));
+    $$(".rail-item").forEach((b) => b.addEventListener("click", () => {
+      setPanel(b.dataset.panel);
+      setSidebarOpen(false);
+    }));
+    $("#btn-sidebar-open")?.addEventListener("click", () => setSidebarOpen(true));
+    $("#btn-sidebar-close")?.addEventListener("click", () => setSidebarOpen(false));
+    $("#sidebar-backdrop")?.addEventListener("click", () => setSidebarOpen(false));
 
     document.addEventListener("click", (e) => {
       const go = e.target.closest("[data-goto-panel]");
