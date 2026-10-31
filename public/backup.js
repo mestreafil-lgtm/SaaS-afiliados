@@ -495,6 +495,13 @@
     return { cls: "is-ok", text: "Estável" };
   }
 
+  function starsHtml(rating) {
+    const raw = Number(rating || 0);
+    const n = Math.max(0, Math.min(5, Math.round(raw)));
+    if (!raw) return "";
+    return `<div class="bk-stars" aria-label="${raw.toFixed(1)} de 5">${"★".repeat(n)}${"☆".repeat(5 - n)} <span>${raw.toFixed(1)}</span></div>`;
+  }
+
   function produtoTile(p, badge, isPrincipal, grupoId, sugestao) {
     if (!p) return "";
     const comR = comissaoBRL(p);
@@ -507,11 +514,12 @@
         <div><span class="bk-tile-com">${Number(p.comissao_pct || 0)}% comissão</span>
           ${comR > 0 ? `<span class="bk-tile-brl"> +${fmt(comR)}</span>` : ""}</div>
         ${p.vendas_shopee ? `<div class="bk-meta">${fmtNum(p.vendas_shopee)} vendidos</div>` : ""}
+        ${starsHtml(p.rating)}
         <div class="bk-tile-acts">
           <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}">Obter link</button>
-          ${!isPrincipal ? `<button type="button" class="del" data-act="remove-from-group" data-gid="${escapeHtml(grupoId || "")}" data-id="${escapeHtml(p.itemId)}"><i class="fa-solid fa-trash"></i></button>` : ""}
+          ${!isPrincipal ? `<button type="button" class="del" data-act="remove-from-group" data-gid="${escapeHtml(grupoId || "")}" data-id="${escapeHtml(p.itemId)}" title="Remover"><i class="fa-solid fa-trash"></i></button>` : ""}
         </div>
-        ${isPrincipal ? `<button type="button" class="bk-btn-vinc mt-1 w-full" data-act="swap" data-gid="${escapeHtml(grupoId || "")}" style="width:100%">Pausar e trocar</button>` : ""}
+        ${isPrincipal ? `<button type="button" class="bk-btn-pause" data-act="swap" data-gid="${escapeHtml(grupoId || "")}">Pausar e trocar</button>` : ""}
       </div>
     </div>`;
   }
@@ -550,50 +558,18 @@
   }
 
   function grupoTilesHtml(g, principal, sorted, sugestao) {
-    if (!isMobileBk()) {
-      const tiles = [
-        principal ? produtoTile(principal, "Principal", true, g.docId, false) : "",
-        ...sorted.map((p, i) => produtoTile(
-          p,
-          `Backup ${i + 1}${sugestao && p.itemId === sugestao.itemId ? " · sugerido" : ""}`,
-          false,
-          g.docId,
-          sugestao && p.itemId === sugestao.itemId,
-        )),
-        `<button type="button" class="bk-add-tile" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}"><i class="fa-solid fa-plus"></i><span>Adicionar reserva</span></button>`,
-      ].join("");
-      return `<div class="bk-tiles">${tiles}</div>`;
-    }
-
-    const PREVIEW = 3;
-    const total = sorted.length;
-    const expanded = Boolean(state.grupoReservasExpanded[g.docId]);
-    const visible = expanded ? sorted : sorted.slice(0, PREVIEW);
-    const hidden = Math.max(0, total - visible.length);
-
-    return `<div class="bk-mobile-tiles">
-      ${principal ? produtoTile(principal, "Principal", true, g.docId, false) : `<div class="bk-reservas-empty">Sem produto principal</div>`}
-      <section class="bk-reservas-sec">
-        <header class="bk-reservas-head">
-          <h5>Backups disponíveis · ${total}</h5>
-        </header>
-        ${total
-          ? `<div class="bk-reservas-list">${visible.map((p) =>
-              reservaCompactHtml(p, g.docId, sugestao && p.itemId === sugestao.itemId)
-            ).join("")}</div>`
-          : `<div class="bk-reservas-empty">Nenhum backup cadastrado</div>`}
-        ${!expanded && hidden > 0
-          ? `<button type="button" class="bk-reservas-more" data-act="expand-reservas" data-gid="${escapeHtml(g.docId)}">+ Ver mais ${hidden} backup${hidden === 1 ? "" : "s"}</button>`
-          : ""}
-        ${expanded && total > PREVIEW
-          ? `<button type="button" class="bk-reservas-more is-collapse" data-act="collapse-reservas" data-gid="${escapeHtml(g.docId)}">Recolher</button>`
-          : ""}
-        <button type="button" class="bk-add-btn" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}">
-          <i class="fa-solid fa-plus" aria-hidden="true"></i>
-          <span>Adicionar reserva</span>
-        </button>
-      </section>
-    </div>`;
+    const tiles = [
+      principal ? produtoTile(principal, "Principal", true, g.docId, false) : "",
+      ...sorted.map((p, i) => produtoTile(
+        p,
+        `Backup ${i + 1}${sugestao && p.itemId === sugestao.itemId ? " · sugerido" : ""}`,
+        false,
+        g.docId,
+        sugestao && p.itemId === sugestao.itemId,
+      )),
+      `<button type="button" class="bk-add-tile" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}"><i class="fa-solid fa-plus"></i><span>Adicionar backup</span></button>`,
+    ].join("");
+    return `<div class="bk-tiles">${tiles}</div>`;
   }
 
   function grupoCardHtml(g) {
@@ -636,8 +612,8 @@
           <div class="min-w-0">
             <h4 class="bk-gname"><i class="fa-solid fa-bullseye"></i><span>${escapeHtml(g.nome)}</span></h4>
             <div class="bk-glink">
-              Principal: <b>${escapeHtml(principal ? (principal.apelido || String(principal.nome || "").slice(0, 42)) : "—")}</b>
-              ${principal?.loja ? ` · ${escapeHtml(principal.loja)}` : ""}
+              Link ativo: <b>${escapeHtml(principal ? (principal.apelido || String(principal.nome || "").slice(0, 42)) : "—")}</b>
+              <span class="bk-reservas-chip">${backups.length} reserva(s)</span>
             </div>
             <div class="bk-gfin">
               <span class="bk-metric">Lucro <b class="is-money">${fmt(g.lucro_historico || 0)}</b></span>
@@ -648,40 +624,41 @@
         </div>
         <div class="bk-gactions">
           ${badge}
-          <button type="button" class="bk-btn-ghost" data-act="refresh-group" data-gid="${escapeHtml(g.docId)}" ${refreshing ? "disabled" : ""}>${refreshing ? "Atualizando…" : "Atualizar"}</button>
+          <button type="button" class="bk-btn-vinc" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}">+ Vincular backup</button>
+          <button type="button" class="bk-icon-btn" data-act="refresh-group" data-gid="${escapeHtml(g.docId)}" title="${refreshing ? "Atualizando" : "Atualizar"}" ${refreshing ? "disabled" : ""}><i class="fa-solid fa-rotate${refreshing ? " fa-spin" : ""}"></i></button>
           <button type="button" class="bk-icon-btn danger" data-act="del-group" data-gid="${escapeHtml(g.docId)}" data-nome="${escapeHtml(g.nome)}" title="Remover grupo"><i class="fa-solid fa-trash"></i></button>
           <button type="button" class="bk-icon-btn" data-act="toggle-group" data-gid="${escapeHtml(g.docId)}" aria-label="Expandir"><i class="fa-solid fa-chevron-${open ? "down" : "right"}"></i></button>
         </div>
       </div>
       ${open ? `<div class="bk-gbody">
-        ${insights.length ? `<div class="bk-advisor">
-          <div class="bk-advisor-title"><i class="fa-solid fa-lightbulb"></i> Contingência Advisor</div>
-          ${insights.map((ins) => `<div class="bk-insight">
-            <div><b>${escapeHtml(ins.titulo)}</b><p>${escapeHtml(ins.mensagem)}</p></div>
-            ${ins.backupId ? `<button type="button" data-act="rotate" data-gid="${escapeHtml(g.docId)}" data-id="${escapeHtml(ins.backupId)}">Trocar principal</button>` : ""}
-          </div>`).join("")}
-        </div>` : ""}
-        ${sugestao ? `<div class="bk-advisor" style="background:#eff6ff;border-color:#bfdbfe">
-          <div class="bk-advisor-title" style="color:#1e3a8a"><i class="fa-solid fa-lightbulb"></i> Sugestão</div>
-          <div class="bk-insight" style="border-color:#bfdbfe">
-            <div><b>Trocar por ${escapeHtml(sugestao.apelido || sugestao.nome || "")}</b>
-            <p>Comissão ${fmt(comissaoBRL(sugestao))} vs ${fmt(comissaoBRL(principal))}</p></div>
-            <button type="button" data-act="swap" data-gid="${escapeHtml(g.docId)}" data-id="${escapeHtml(sugestao.itemId)}">Trocar principal</button>
-          </div>
-        </div>` : ""}
-        ${backups.length ? `<div class="bk-sort-row">
-          <span>Ordenar por:</span>
-          ${[["comissao", "Maior comissão"], ["vendas", "Mais vendas"], ["rating", "Melhor rating"]].map(([id, lab]) =>
-            `<button type="button" class="bk-chip ${state.criterio === id ? "is-active" : ""}" data-act="criterio" data-c="${id}">${lab}</button>`
-          ).join("")}
-        </div>` : ""}
-        ${grupoTilesHtml(g, principal, sorted, sugestao)}
-        ${open && principal ? `<div class="bk-robo" id="bk-robo-${escapeHtml(g.docId)}">
-          <div class="bk-robo-head"><span><i class="fa-solid fa-bolt"></i> Robô de Garimpo</span>
+        ${principal ? `<div class="bk-robo" id="bk-robo-${escapeHtml(g.docId)}">
+          <div class="bk-robo-head"><span><i class="fa-solid fa-bolt"></i> Robô de Garimpo — ofertas semelhantes</span>
             <button type="button" class="bk-icon-btn" data-act="robo" data-gid="${escapeHtml(g.docId)}" title="Buscar de novo"><i class="fa-solid fa-rotate"></i></button>
           </div>
           <div class="bk-robo-body">Buscando ofertas semelhantes na mesma faixa de preço…</div>
         </div>` : ""}
+        ${insights.length ? `<div class="bk-advisor">
+          <div class="bk-advisor-title"><i class="fa-solid fa-lightbulb"></i> Contingência Advisor</div>
+          ${insights.map((ins) => `<div class="bk-insight">
+            <div><b>${escapeHtml(ins.titulo)}</b><p>${escapeHtml(ins.mensagem)}</p></div>
+            ${ins.backupId ? `<button type="button" class="bk-btn-rotate" data-act="rotate" data-gid="${escapeHtml(g.docId)}" data-id="${escapeHtml(ins.backupId)}">Rotacionar agora</button>` : ""}
+          </div>`).join("")}
+        </div>` : ""}
+        ${sugestao ? `<div class="bk-sugestao">
+          <div class="bk-advisor-title"><i class="fa-solid fa-lightbulb"></i> Sugestão</div>
+          <div class="bk-insight">
+            <div><b>Trocar por ${escapeHtml(sugestao.apelido || sugestao.nome || "")}</b>
+            <p>Motivo: comissão ${fmt(comissaoBRL(sugestao))} contra ${fmt(comissaoBRL(principal))} do principal.</p></div>
+            <button type="button" class="bk-btn-troca" data-act="swap" data-gid="${escapeHtml(g.docId)}" data-id="${escapeHtml(sugestao.itemId)}">Trocar agora</button>
+          </div>
+        </div>` : ""}
+        ${backups.length ? `<div class="bk-sort-row">
+          <span>Ordenar por:</span>
+          ${[["comissao", "Comissão"], ["rating", "Rating"], ["vendas", "Vendas"]].map(([id, lab]) =>
+            `<button type="button" class="bk-chip ${state.criterio === id ? "is-active" : ""}" data-act="criterio" data-c="${id}">${lab}</button>`
+          ).join("")}
+        </div>` : ""}
+        ${grupoTilesHtml(g, principal, sorted, sugestao)}
         ${(g.historico || []).length ? `<div class="bk-hist-block"><div class="bk-meta font-semibold mb-1">Histórico de trocas (${g.historico.length})</div>
           ${[...g.historico].reverse().slice(0, 8).map((h) =>
             `<div class="bk-hist is-muted">${escapeHtml(new Date(h.data).toLocaleString("pt-BR"))} · ${escapeHtml(h.motivo || "")}</div>`
@@ -783,14 +760,21 @@
       const ofertas = r.ofertas || [];
       const html = ofertas.length
         ? `<p class="bk-meta">Termo “${escapeHtml(r.termoUsado || "")}” · ${ofertas.length} oferta(s)</p>`
-          + ofertas.map((p) => `<div class="bk-robo-item">
-            ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" />` : ""}
+          + ofertas.map((p) => {
+            const mesma = principal.shopId && String(p.shopId || "") === String(principal.shopId);
+            return `<div class="bk-robo-item">
+            ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" />` : `<div class="bk-thumb-ph sm"><i class="fa-solid fa-box"></i></div>`}
             <div class="min-w-0" style="flex:1">
+              <div class="bk-robo-badges">
+                <span class="bk-mini-badge ${mesma ? "is-same" : "is-other"}">${mesma ? "Mesma loja" : "Outra loja"}</span>
+                <span class="bk-mini-badge is-com">${Number(p.comissao_pct || 0).toFixed(1)}% comissão</span>
+              </div>
               <b>${escapeHtml(String(p.nome || "").slice(0, 70))}</b>
-              <div class="bk-meta">${escapeHtml(p.loja || "")} · ${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}%</div>
+              <div class="bk-meta">${escapeHtml(p.loja || "")} · ${fmt(p.preco)}${p.vendas || p.vendas_shopee ? ` · ${fmtNum(p.vendas || p.vendas_shopee)} vendidos` : ""}</div>
             </div>
-            <button type="button" class="btn brand sm" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">+ Reserva</button>
-          </div>`).join("")
+            <button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Adicionar nesta</button>
+          </div>`;
+          }).join("")
         : `<div class="bk-meta">Nenhuma oferta na faixa de preço. Ajuste em Configurações.</div>`;
       state.roboCache[cacheKey] = html;
       state.roboOfertas = state.roboOfertas || {};

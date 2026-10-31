@@ -2196,13 +2196,13 @@
     if (!document.querySelector("link[data-backup-css]")) {
       const l = document.createElement("link");
       l.rel = "stylesheet";
-      l.href = "/backup.css?v=pro-3";
+      l.href = "/backup.css?v=pro-4";
       l.dataset.backupCss = "1";
       document.head.appendChild(l);
     }
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = "/backup.js?v=pro-3";
+      s.src = "/backup.js?v=pro-4";
       s.async = true;
       s.onload = resolve;
       s.onerror = () => reject(new Error("backup.js"));
@@ -2722,12 +2722,14 @@
     return state.statusPin;
   }
 
-  function sortRows(rows, key, dir, getter) {
+  function sortRows(rows, key, dir, getter, opts = {}) {
     if (!rows?.length) return rows || [];
     const get = getter || ((r) => r[key]);
-    const statusRank = statusPinRank();
-    const group = state.groupByStatus === true;
-    // Sem agrupar, a linha fica onde a métrica colocou (desativar não joga pra longe).
+    const campanha = opts.forceCampanha === true;
+    const statusRank = campanha
+      ? { ativa: 0, teste: 1, desativada: 2, pausada: 2 }
+      : statusPinRank();
+    const group = campanha || state.groupByStatus === true;
     return [...rows].sort((a, b) => {
       if (group) {
         const ra = statusRank[normalizeStatus(a.status)] ?? 9;
@@ -4694,6 +4696,7 @@
     }
     if (!state.subidSort?.key) state.subidSort = { key: "comissao", dir: "desc" };
     const statusRank = statusPinRank();
+    const campanha = channel === "meta" || channel === "pinterest";
     all = sortRows(all, state.subidSort.key || "comissao", state.subidSort.dir || "desc", (r) => {
       if (state.subidSort.key === "subid") return r.subid;
       if (state.subidSort.key === "status") return statusRank[normalizeStatus(r.status)] ?? 9;
@@ -4714,7 +4717,7 @@
       }
       if (state.subidSort.key === "tendencia") return subidTrendScore(r);
       return r[state.subidSort.key];
-    });
+    }, campanha ? { forceCampanha: true } : undefined);
     return all;
   }
 
