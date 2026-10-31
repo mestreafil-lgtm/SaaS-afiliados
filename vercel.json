@@ -10,7 +10,9 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/app", "destination": "/app.html" },
-    { "source": "/app/", "destination": "/app.html" }
+    { "source": "/app/", "destination": "/app.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/admin/", "destination": "/admin.html" }
   ],
   "headers": [
     {
