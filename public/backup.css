@@ -1467,11 +1467,14 @@
 .bk-split-left .bk-tile.is-main img { height: 260px; width: 100%; object-fit: cover; object-position: center 35%; background: #fff; }
 .bk-split-left .bk-tile.is-main .bk-tile-ph { height: 260px; }
 
-/* Coluna direita: robô em cima, vinculadas como mini cards */
+/* Coluna direita: robô em cima, vinculadas como mini cards ordenados por comissão */
 .bk-split-right { display: flex; flex-direction: column; gap: 12px; }
-.bk-vinc-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 13px; }
-.bk-vinc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.bk-vinc-item { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 6px; border: 1px solid #E5E7EB; border-radius: 10px; background: #fff; }
-.bk-vinc-item img, .bk-vinc-ph { width: 100%; height: 96px; border-radius: 8px; object-fit: cover; display: flex; align-items: center; justify-content: center; }
-.bk-vinc-name { font-size: 12px; font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.bk-vinc-item .bk-icon-btn { position: absolute; top: 8px; right: 8px; background: #fff; border-radius: 6px; padding: 3px 6px; }
+.bk-vinc-head { font-weight: 600; font-size: 13px; color: #374151; }
+.bk-vinc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.bk-vinc-item { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid #E5E7EB; border-radius: 10px; background: #fff; }
+.bk-vinc-item img, .bk-vinc-ph { width: 100%; height: 84px; border-radius: 8px; object-fit: cover; display: flex; align-items: center; justify-content: center; }
+.bk-vinc-name { font-size: 13px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bk-vinc-price { font-size: 14px; font-weight: 700; color: #E4572E; }
+.bk-vinc-acts { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.bk-vinc-acts button:first-child { flex: 1; border: 0; border-radius: 8px; padding: 6px 8px; background: #E4572E; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+.bk-vinc-acts .bk-icon-btn { padding: 4px 8px; }
