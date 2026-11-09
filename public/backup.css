@@ -1492,3 +1492,9 @@
 .bk-vinc-item .bk-meta { font-size: 11px; line-height: 1.35; }
 .bk-vinc-acts button:first-child { font-size: 11px; padding: 5px 6px; }
 @media (max-width: 900px) { .bk-split { grid-template-columns: 1fr; } .bk-vinc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Robô: ações de troca compactas; tag numerada nas vinculadas */
+.bk-robo-acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+.bk-btn-troca-robo { border: 1px solid #7C3AED; background: #fff; color: #5B21B6; border-radius: 8px; padding: 5px 8px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.bk-btn-troca-robo:hover { background: #F5F3FF; }
+.bk-vinc-tag { font-size: 10px; font-weight: 700; color: #5B21B6; background: #EDE9FE; border-radius: 6px; padding: 1px 6px; align-self: flex-start; }
