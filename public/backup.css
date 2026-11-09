@@ -1500,3 +1500,6 @@
 .bk-robo-acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; flex-shrink: 0; }
 .bk-select-troca { height: 32px; border: 1px solid #DDD6FE; border-radius: 8px; background: #fff; color: #5B21B6; font-size: 12px; font-weight: 600; padding: 0 6px; max-width: 170px; }
 .bk-vinc-tag { font-size: 10px; font-weight: 700; color: #5B21B6; background: #EDE9FE; border-radius: 6px; padding: 1px 6px; align-self: flex-start; }
+
+/* Coluna da direita centralizada verticalmente ao lado do principal */
+.bk-split-right { justify-content: center; }
