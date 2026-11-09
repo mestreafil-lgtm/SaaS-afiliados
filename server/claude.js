@@ -653,6 +653,50 @@ function defaultMonthStart() {
   return brtFirstDayOfMonth();
 }
 
+/**
+ * Compara visualmente o produto principal com derivadas candidatas (fotos por URL).
+ * Usa Haiku por padrão (custo baixo). Retorna [{ itemId, nota (0-10), motivo }].
+ */
+async function compararDerivadasComIA({ principal, candidatos, model = "claude-haiku-5-5" } = {}, userId = requireUserId()) {
+  const cred = await loadClaudeCredentials(userId);
+  if (!cred.apiKey) throw new Error("Configure a chave da API Claude em Configurações para usar a comparação com IA.");
+  const lista = (candidatos || []).filter((c) => c.imagem && c.itemId).slice(0, 12);
+  if (!principal?.imagem || !lista.length) return [];
+
+  const content = [
+    {
+      type: "text",
+      text: "A primeira foto é o PRODUTO PRINCIPAL. As fotos seguintes são CANDIDATOS, cada uma precedida pelo seu itemId. "
+        + "Para cada candidato, dê uma nota de 0 a 10 de semelhança de PEÇA (modelagem, cintura, tecido e estilo), ignorando cor e fundo. "
+        + "Responda somente JSON no formato [{\"itemId\":\"...\",\"nota\":0,\"motivo\":\"frase curta\"}].",
+    },
+    { type: "text", text: "PRINCIPAL" },
+    { type: "image", source: { type: "url", url: principal.imagem } },
+  ];
+  for (const c of lista) {
+    content.push({ type: "text", text: `CANDIDATO itemId=${c.itemId}` });
+    content.push({ type: "image", source: { type: "url", url: c.imagem } });
+  }
+
+  const out = await callAnthropic({
+    apiKey: cred.apiKey,
+    model,
+    system: "Você compara fotos de produtos de moda para um afiliado. Responda apenas JSON válido.",
+    messages: [{ role: "user", content }],
+  });
+  const ini = out.reply.indexOf("[");
+  const fim = out.reply.lastIndexOf("]");
+  if (ini < 0 || fim < ini) throw new Error("A IA não devolveu uma lista válida.");
+  const parsed = JSON.parse(out.reply.slice(ini, fim + 1));
+  return parsed
+    .filter((x) => x && x.itemId)
+    .map((x) => ({
+      itemId: String(x.itemId),
+      nota: Math.max(0, Math.min(10, Number(x.nota) || 0)),
+      motivo: String(x.motivo || "").slice(0, 160),
+    }));
+}
+
 module.exports = {
   loadClaudeCredentials,
   saveClaudeCredentials,
@@ -661,5 +705,6 @@ module.exports = {
   chatClaude,
   buildAnalyticsContext,
   estimateCostUsd,
+  compararDerivadasComIA,
   DEFAULT_MODEL,
 };

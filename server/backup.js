@@ -1332,31 +1332,43 @@ function termoGarimpo(nome, apelido) {
 async function garimpoContextual(body = {}, userId = requireUserId()) {
   const termo = termoGarimpo(body.nome, body.apelido);
   if (!termo) return { ofertas: [], termoUsado: "" };
-  const acima = Math.min(100, Math.max(0, Number(body.precoToleranciaAcimaPct ?? 15)));
-  const abaixo = Math.min(100, Math.max(0, Number(body.precoToleranciaAbaixoPct ?? 25)));
+  // Derivadas: até 5% acima do preço original; abaixo, qualquer valor (quanto mais barato, melhor).
+  const acima = Math.min(100, Math.max(0, Number(body.precoToleranciaAcimaPct ?? 5)));
   const preco = parseMoneyGarimpo(body.preco);
-  const min = preco > 0 ? preco * (1 - abaixo / 100) : 0;
   const max = preco > 0 ? preco * (1 + acima / 100) : Infinity;
+  // Critérios do operador: comissão em R$ (prioridade 1), vendas mínimas e avaliação como desempate.
+  const comissaoMin = Math.max(0, Number(body.comissaoMinBRL ?? 5));
+  const vendasMin = Math.max(0, Number(body.vendasMin ?? 300));
+  const limite = Math.min(3, Math.max(1, Number(body.limite ?? 3)));
   const exclude = new Set((body.excludeItemIds || []).map(String));
-  const shopId = body.shopId ? String(body.shopId) : null;
-  let pack = await queryProductOffersByKeyword(termo, { shopId, limit: 20, sortType: 2 });
-  let nodes = pack.nodes || [];
-  let fonte = shopId ? "loja" : "geral";
-  if (!nodes.length && shopId) {
-    pack = await queryProductOffersByKeyword(termo, { limit: 20, sortType: 2 });
-    nodes = pack.nodes || [];
-    fonte = "geral";
-  }
-  const ofertas = nodes
+  // Busca geral (sem filtrar por loja), para achar derivadas de outras lojas.
+  const pack = await queryProductOffersByKeyword(termo, { limit: 50, sortType: 2 });
+  const comissaoRS = (p) => Number(p.comissao_valor || 0) || (Number(p.preco || 0) * Number(p.comissao_pct || 0)) / 100;
+  const ofertas = (pack.nodes || [])
     .map(normalizeShopeeProduct)
     .filter((p) => p.itemId && !exclude.has(String(p.itemId)))
-    .filter((p) => {
-      const v = Number(p.precoMin || p.preco || 0);
-      if (!(preco > 0)) return true;
-      return v >= min && v <= max;
-    })
-    .slice(0, 5);
-  return { ofertas, termoUsado: termo, fonte };
+    .filter((p) => (preco > 0 ? Number(p.precoMin || p.preco || 0) <= max : true))
+    .filter((p) => comissaoRS(p) >= comissaoMin)
+    .filter((p) => Number(p.vendas_shopee || 0) >= vendasMin)
+    .sort((a, b) => (comissaoRS(b) - comissaoRS(a)) || (b.vendas_shopee - a.vendas_shopee) || (b.rating - a.rating))
+    .slice(0, body.usarIA ? 12 : limite);
+
+  // Comparação visual com IA (Haiku): nota de semelhança de peça; sem IA ou se falhar, mantém o ranking numérico.
+  if (body.usarIA && ofertas.length) {
+    try {
+      const { compararDerivadasComIA } = require("./claude");
+      const notas = await compararDerivadasComIA({ principal: body.principal || {}, candidatos: ofertas }, userId);
+      const porId = new Map(notas.map((n) => [n.itemId, n]));
+      const comNota = ofertas
+        .map((p) => ({ ...p, nota_ia: porId.get(String(p.itemId))?.nota ?? null, motivo_ia: porId.get(String(p.itemId))?.motivo || "" }))
+        .filter((p) => p.nota_ia !== null && p.nota_ia >= 6)
+        .sort((a, b) => (b.nota_ia - a.nota_ia) || (comissaoRS(b) - comissaoRS(a)));
+      return { ofertas: comNota.slice(0, limite), termoUsado: termo, fonte: "ia" };
+    } catch (err) {
+      return { ofertas: ofertas.slice(0, limite), termoUsado: termo, fonte: "geral", iaErro: err.message };
+    }
+  }
+  return { ofertas: ofertas.slice(0, limite), termoUsado: termo, fonte: "geral" };
 }
 
 module.exports = {
