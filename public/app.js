@@ -2196,13 +2196,13 @@
     if (!document.querySelector("link[data-backup-css]")) {
       const l = document.createElement("link");
       l.rel = "stylesheet";
-      l.href = "/backup.css?v=pro-5";
+      l.href = "/backup.css?v=pro-6";
       l.dataset.backupCss = "1";
       document.head.appendChild(l);
     }
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = "/backup.js?v=pro-5";
+      s.src = "/backup.js?v=pro-6";
       s.async = true;
       s.onload = resolve;
       s.onerror = () => reject(new Error("backup.js"));
