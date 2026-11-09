@@ -1503,3 +1503,9 @@
 
 /* Coluna da direita centralizada verticalmente ao lado do principal */
 .bk-split-right { justify-content: center; }
+
+/* Vincular por link dentro do modal */
+.bk-modal-sep { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; color: #9CA3AF; font-size: 12px; }
+.bk-modal-sep::before, .bk-modal-sep::after { content: ""; flex: 1; height: 1px; background: #E5E7EB; }
+.bk-link-row { display: flex; gap: 8px; align-items: center; }
+.bk-link-row input { flex: 1; min-width: 0; }
