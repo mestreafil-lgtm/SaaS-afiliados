@@ -23,6 +23,10 @@ function parseShopeeUrl(url) {
   m = cleaned.match(/-i\.(\d+)\.(\d+)/i);
   if (m) return { shopId: m[1], itemId: m[2], isShort: false };
 
+  // Redirecionamento de link curto: shopee.com.br/<slug>/<shopId>/<itemId>
+  m = cleaned.match(/^https?:\/\/(?:www\.)?shopee\.com\.br\/[^/?#]+\/(\d+)\/(\d+)/i);
+  if (m) return { shopId: m[1], itemId: m[2], isShort: false };
+
   const mShop = cleaned.match(/[?&]shop(?:_?id)?=(\d+)/i);
   const mItem = cleaned.match(/[?&]item(?:_?id)?=(\d+)/i);
   if (mShop && mItem) return { shopId: mShop[1], itemId: mItem[1], isShort: false };
