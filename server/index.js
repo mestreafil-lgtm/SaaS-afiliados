@@ -45,6 +45,7 @@ const {
   removerBackup,
   editarBackupMeta,
   atualizarBackup,
+  marcarAlertaVisto,
   atualizarBackupsEmLote,
   atualizarGrupoBackup,
   buscarSimilaresDaLoja,
@@ -974,6 +975,17 @@ async function requestHandler(req, res) {
           try {
             await removerBackup(body.itemId);
             sendJson(res, 200, { success: true });
+          } catch (err) {
+            sendJson(res, 400, { success: false, error: err.message });
+          }
+          return;
+        }
+
+        if (pathname === "/api/backup/alertas/visto" && req.method === "POST") {
+          const body = await readBody(req);
+          try {
+            const result = await marcarAlertaVisto(body.itemId, body.tipo);
+            sendJson(res, 200, result);
           } catch (err) {
             sendJson(res, 400, { success: false, error: err.message });
           }
