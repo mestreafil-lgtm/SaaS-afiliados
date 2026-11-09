@@ -953,9 +953,6 @@
               <button type="button" class="backup-tab is-active" data-backup-tab="grupos"><i class="fa-solid fa-bullseye"></i> Ninhos/Grupos <span class="count" data-tab-count="grupos">0</span></button>
               <button type="button" class="backup-tab" data-backup-tab="cadastrar"><i class="fa-solid fa-plus"></i> Cadastrar link</button>
               <button type="button" class="backup-tab" data-backup-tab="listagem"><i class="fa-solid fa-box-archive"></i> Meus Backups <span class="count" data-tab-count="listagem">0</span></button>
-              <button type="button" class="backup-tab" data-backup-tab="garimpo"><i class="fa-solid fa-gem"></i> Garimpo inteligente</button>
-              <button type="button" class="backup-tab" data-backup-tab="recompra"><i class="fa-solid fa-arrows-rotate"></i> Radar de recompra <span class="count" data-tab-count="recompra">0</span></button>
-              <button type="button" class="backup-tab" data-backup-tab="similar"><i class="fa-solid fa-magnifying-glass"></i> Rastrear similares</button>
               <button type="button" class="backup-tab" data-backup-tab="config"><i class="fa-solid fa-gear"></i> Configurações</button>
             </div>
 
@@ -1014,31 +1011,6 @@
               </section>
               <p class="text-xs text-slate-500" id="backup-list-meta">—</p>
               <div id="backup-list" class="bk-table-wrap"></div>
-            </div>
-
-            <div id="backup-tab-garimpo" class="bk-tab-panel hidden space-y-4">
-              <div class="bk-subtabs" id="backup-garimpo-subtabs">
-                <button type="button" class="bk-chip is-active" data-garimpo-aba="portfolio">Já vendi</button>
-                <button type="button" class="bk-chip" data-garimpo-aba="descoberta">Descoberta</button>
-              </div>
-              <input type="search" id="backup-garimpo-search" class="search w-full" placeholder="Buscar por nome ou loja…" />
-              <p class="text-xs text-slate-500" id="backup-garimpo-meta">—</p>
-              <div id="backup-garimpo-list" class="space-y-2"></div>
-            </div>
-
-            <div id="backup-tab-recompra" class="bk-tab-panel hidden space-y-4">
-              <input type="search" id="backup-recompra-search" class="search w-full" placeholder="Buscar produto para recompra…" />
-              <p class="text-xs text-slate-500" id="backup-recompra-meta">—</p>
-              <div id="backup-recompra-list" class="space-y-2"></div>
-            </div>
-
-            <div id="backup-tab-similar" class="bk-tab-panel hidden space-y-4">
-              <section class="light-card rounded-2xl p-5 shadow-sm">
-                <label class="block text-sm font-semibold text-slate-800 mb-2">Escolha um produto principal</label>
-                <p class="text-xs text-slate-500 mb-3">Encontre outras ofertas da mesma loja para usar como reserva.</p>
-                <select id="backup-similar-select" class="search w-full"></select>
-              </section>
-              <div id="backup-similar-results"></div>
             </div>
 
             <div id="backup-tab-config" class="bk-tab-panel hidden">

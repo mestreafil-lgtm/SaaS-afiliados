@@ -6,7 +6,7 @@
   function $$(sel, root) { return [...(root || document).querySelectorAll(sel)]; }
 
   const CFG_KEY = "bk_pro_cfg_v1";
-  const TABS = ["grupos", "cadastrar", "listagem", "garimpo", "recompra", "similar", "config"];
+  const TABS = ["grupos", "cadastrar", "listagem", "config"];
 
   const state = {
     wired: false,
@@ -182,9 +182,6 @@
     updateTabLabels();
     if (state.tab === "grupos") renderGrupos();
     if (state.tab === "listagem") renderListagem();
-    if (state.tab === "similar") renderSimilarSetup();
-    if (state.tab === "garimpo") renderGarimpo();
-    if (state.tab === "recompra") renderRecompra();
     if (state.tab === "config") renderConfig();
   }
 
