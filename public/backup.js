@@ -769,7 +769,7 @@
           excludeItemIds: exclude,
           precoToleranciaAcimaPct: 5,
           comissaoMinBRL: 5,
-          vendasMin: 300,
+          vendasMin: 0,
           limite: 3,
           usarIA: true,
           principal: { imagem: principal.imagem || "" },
@@ -795,7 +795,7 @@
             <button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button>
           </div>`;
           }).join("")
-        : `<div class="bk-meta">Nenhuma derivada com os critérios: até 5% acima do preço, comissão mínima R$ 5, vendas mínimas 300.</div>`);
+        : `<div class="bk-meta">Nenhuma derivada com os critérios: até 5% acima do preço e comissão mínima R$ 5. As vendas aparecem em cada linha para você decidir.</div>`);
       state.roboCache[cacheKey] = html;
       state.roboOfertas = state.roboOfertas || {};
       for (const p of ofertas) state.roboOfertas[String(p.itemId)] = p;
