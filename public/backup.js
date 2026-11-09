@@ -557,6 +557,18 @@
     </article>`;
   }
 
+  function vincCompactHtml(p, grupoId) {
+    const comR = comissaoBRL(p);
+    return `<div class="bk-vinc-item">
+      ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph" style="width:48px;height:48px"><i class="fa-solid fa-box"></i></div>`}
+      <div class="bk-vinc-info">
+        <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
+        <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos</div>
+      </div>
+      <button type="button" class="bk-icon-btn danger" data-act="remove-from-group" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Remover"><i class="fa-solid fa-trash"></i></button>
+    </div>`;
+  }
+
   function grupoCardHtml(g) {
     const principal = g.produtos?.[g.principalItemId];
     const backups = (g.backupItemIds || []).map((id) => g.produtos?.[id]).filter(Boolean);
@@ -621,13 +633,7 @@
           <div class="bk-split-left">
             ${principal ? produtoTile(principal, "Principal", true, g.docId, false) : ""}
             ${backups.length ? `<button type="button" class="bk-btn-vinc-toggle" data-act="toggle-vinc" data-gid="${escapeHtml(g.docId)}">Ver vinculadas (${backups.length}) ${vincAberto ? "▴" : "▾"}</button>` : ""}
-            ${vincAberto ? `<div class="bk-tiles">${sorted.map((p, i) => produtoTile(
-              p,
-              `Backup ${i + 1}${sugestao && p.itemId === sugestao.itemId ? " · sugerido" : ""}`,
-              false,
-              g.docId,
-              sugestao && p.itemId === sugestao.itemId,
-            )).join("")}<button type="button" class="bk-add-tile" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}"><i class="fa-solid fa-plus"></i><span>Adicionar backup</span></button></div>` : ""}
+            ${vincAberto ? `<div class="bk-vinc-list">${sorted.map((p) => vincCompactHtml(p, g.docId)).join("")}<button type="button" class="bk-btn-vinc-toggle" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}">+ Adicionar backup</button></div>` : ""}
           </div>
           ${principal ? `<div class="bk-robo bk-split-right" id="bk-robo-${escapeHtml(g.docId)}">
             <div class="bk-robo-head"><span><i class="fa-solid fa-bolt"></i> Robô de Garimpo — ofertas semelhantes</span>
