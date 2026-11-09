@@ -15,6 +15,7 @@ const { syncMetaDaily, metaCredentialsPublic } = require("./meta");
 const { credentialsPublic } = require("./store");
 const { shopeeEndDate, brtSubtractDays } = require("./brtDates");
 const { notifyYesterdayCommission } = require("./pushCommission");
+const { atualizarTodosBackupsDoUsuario } = require("./backup");
 
 const LOCAL_INTERVAL_MS = Number(process.env.AUTO_SYNC_INTERVAL_MS || 2 * 60 * 60 * 1000);
 const LOCAL_BOOT_DELAY_MS = Number(process.env.AUTO_SYNC_BOOT_DELAY_MS || 20_000);
@@ -121,6 +122,16 @@ async function runAutoSync({ mode = "daily" } = {}) {
     try {
       const r = await syncOneUser(user, { ...range, persistSubIds });
       results.push({ ok: !r.error, ...r });
+      // Verificação diária dos backups (principal e reservas): preço e comissão
+      // atualizados de madrugada, e quedas de comissão viram alerta no Backup.
+      if (syncMode === "daily") {
+        try {
+          const b = await atualizarTodosBackupsDoUsuario(user.id);
+          console.log(`[autoSync] ${user.email}: backups verificados ${b.ok}/${b.total}`);
+        } catch (e) {
+          console.warn(`[autoSync] ${user.email} backups:`, e.message || e);
+        }
+      }
       console.log(
         `[autoSync] ${user.email}: shopee nodes=${r.shopee?.nodes ?? "—"} meta=${r.meta?.gravados ?? r.meta?.error ?? "skip"}`,
       );

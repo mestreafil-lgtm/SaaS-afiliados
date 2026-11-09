@@ -1623,3 +1623,18 @@
 @media (max-width: 900px) {
   .bk-kpi-grid--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.bk-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.bk-hero-btn-novo {
+  background: #EA580C;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}

@@ -366,8 +366,6 @@
     setKpi("cobertura", `${pct}%`, `${okApi} retornam com comissão`);
     setKpi("comissao", fmt(media), topo > 0 ? `topo ${fmt(topo)}` : "—");
     setKpi("rotacao", String(rotacoes), rotacoes ? `${melhorGrupo}: backup rende mais` : "principal é o melhor");
-    const diasAntigo = idadeAntigo != null ? Math.floor(idadeAntigo / 86400000) : null;
-    setKpi("scan", diasAntigo != null ? `${diasAntigo} dias` : "—", "rode \"Varrer ofertas\"");
     renderAlertasComissao(backups);
     const foot = $("#backup-kpi-foot");
     if (foot) {
@@ -378,9 +376,17 @@
     }
     const live = $("#backup-live-status");
     if (live) {
-      live.innerHTML = recente
-        ? `<span class="bk-dot"></span>Última atualização ${escapeHtml(formatTempoAtras(new Date(recente).toISOString()))}`
-        : `<span class="bk-dot"></span>Aguardando primeira varredura`;
+      if (recente) {
+        const d = new Date(recente);
+        const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+        const hoje = d.toDateString() === new Date().toDateString();
+        const quando = hoje
+          ? `hoje às ${hora}`
+          : `em ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })} às ${hora}`;
+        live.innerHTML = `<span class="bk-dot"></span>Sincronizado ${escapeHtml(quando)}`;
+      } else {
+        live.innerHTML = `<span class="bk-dot"></span>Aguardando sincronização`;
+      }
     }
     const scanStrong = $("#backup-scan-info strong");
     if (scanStrong && recente) scanStrong.textContent = new Date(recente).toISOString();

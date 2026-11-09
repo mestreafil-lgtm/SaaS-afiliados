@@ -617,7 +617,7 @@ async function removerBackup(itemId, userId = requireUserId()) {
 
 async function editarBackupMeta(itemId, { apelido, marcadoPrincipal } = {}, userId = requireUserId()) {
   const supabase = getSupabase();
-  const patch = { ultima_verificacao: new Date().toISOString() };
+  const patch = {};
   if (apelido != null) patch.apelido = String(apelido).slice(0, 120);
   if (marcadoPrincipal != null) patch.marcado_principal = Boolean(marcadoPrincipal);
   const { error } = await supabase
@@ -657,6 +657,30 @@ function mesclarAlertasComissao(anteriores, novos) {
   );
   const outros = (novos || []).filter((a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo));
   return [...pendentesMantidos, ...novosComissao, ...outros];
+}
+
+async function atualizarTodosBackupsDoUsuario(userId) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("product_backups")
+    .select("item_id")
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  const todos = (data || []).map((r) => String(r.item_id));
+  if (!todos.length) return { total: 0, ok: 0 };
+  // Principais primeiro, depois as reservas (backups)
+  const { data: grupos, error: gErr } = await supabase
+    .from("product_backup_grupos")
+    .select("principal_item_id")
+    .eq("user_id", userId);
+  if (gErr) throw new Error(gErr.message);
+  const principais = new Set((grupos || []).map((g) => String(g.principal_item_id || "")).filter(Boolean));
+  const ids = [
+    ...todos.filter((id) => principais.has(id)),
+    ...todos.filter((id) => !principais.has(id)),
+  ];
+  const results = await atualizarBackupsEmLote(ids, userId);
+  return { total: ids.length, ok: results.filter((r) => r.ok).length };
 }
 
 async function marcarAlertaVisto(itemId, tipo, userId = requireUserId()) {
@@ -1457,6 +1481,7 @@ module.exports = {
   editarBackupMeta,
   atualizarBackup,
   marcarAlertaVisto,
+  atualizarTodosBackupsDoUsuario,
   atualizarBackupsEmLote,
   atualizarGrupoBackup,
   buscarSimilaresDaLoja,
