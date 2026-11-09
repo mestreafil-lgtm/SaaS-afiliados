@@ -557,25 +557,11 @@
     </article>`;
   }
 
-  function grupoTilesHtml(g, principal, sorted, sugestao) {
-    const tiles = [
-      principal ? produtoTile(principal, "Principal", true, g.docId, false) : "",
-      ...sorted.map((p, i) => produtoTile(
-        p,
-        `Backup ${i + 1}${sugestao && p.itemId === sugestao.itemId ? " · sugerido" : ""}`,
-        false,
-        g.docId,
-        sugestao && p.itemId === sugestao.itemId,
-      )),
-      `<button type="button" class="bk-add-tile" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}"><i class="fa-solid fa-plus"></i><span>Adicionar backup</span></button>`,
-    ].join("");
-    return `<div class="bk-tiles">${tiles}</div>`;
-  }
-
   function grupoCardHtml(g) {
     const principal = g.produtos?.[g.principalItemId];
     const backups = (g.backupItemIds || []).map((id) => g.produtos?.[id]).filter(Boolean);
     const open = state.grupoExpandido === g.docId;
+    const vincAberto = !!state.vincAberto?.[g.docId];
     const insights = analisarInsights(principal, backups);
     const sorted = [...backups].sort((a, b) => {
       if (state.criterio === "rating") return Number(b.rating || 0) - Number(a.rating || 0);
@@ -631,12 +617,25 @@
         </div>
       </div>
       ${open ? `<div class="bk-gbody">
-        ${principal ? `<div class="bk-robo" id="bk-robo-${escapeHtml(g.docId)}">
-          <div class="bk-robo-head"><span><i class="fa-solid fa-bolt"></i> Robô de Garimpo — ofertas semelhantes</span>
-            <button type="button" class="bk-icon-btn" data-act="robo" data-gid="${escapeHtml(g.docId)}" title="Buscar de novo"><i class="fa-solid fa-rotate"></i></button>
+        <div class="bk-split">
+          <div class="bk-split-left">
+            ${principal ? produtoTile(principal, "Principal", true, g.docId, false) : ""}
+            ${backups.length ? `<button type="button" class="bk-btn-vinc-toggle" data-act="toggle-vinc" data-gid="${escapeHtml(g.docId)}">Ver vinculadas (${backups.length}) ${vincAberto ? "▴" : "▾"}</button>` : ""}
+            ${vincAberto ? `<div class="bk-tiles">${sorted.map((p, i) => produtoTile(
+              p,
+              `Backup ${i + 1}${sugestao && p.itemId === sugestao.itemId ? " · sugerido" : ""}`,
+              false,
+              g.docId,
+              sugestao && p.itemId === sugestao.itemId,
+            )).join("")}<button type="button" class="bk-add-tile" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}"><i class="fa-solid fa-plus"></i><span>Adicionar backup</span></button></div>` : ""}
           </div>
-          <div class="bk-robo-body">Buscando ofertas semelhantes na mesma faixa de preço…</div>
-        </div>` : ""}
+          ${principal ? `<div class="bk-robo bk-split-right" id="bk-robo-${escapeHtml(g.docId)}">
+            <div class="bk-robo-head"><span><i class="fa-solid fa-bolt"></i> Robô de Garimpo — ofertas semelhantes</span>
+              <button type="button" class="bk-icon-btn" data-act="robo" data-gid="${escapeHtml(g.docId)}" title="Buscar de novo"><i class="fa-solid fa-rotate"></i></button>
+            </div>
+            <div class="bk-robo-body">Buscando ofertas semelhantes na mesma faixa de preço…</div>
+          </div>` : ""}
+        </div>
         ${insights.length ? `<div class="bk-advisor">
           <div class="bk-advisor-title"><i class="fa-solid fa-lightbulb"></i> Contingência Advisor</div>
           ${insights.map((ins) => `<div class="bk-insight">
@@ -658,7 +657,6 @@
             `<button type="button" class="bk-chip ${state.criterio === id ? "is-active" : ""}" data-act="criterio" data-c="${id}">${lab}</button>`
           ).join("")}
         </div>` : ""}
-        ${grupoTilesHtml(g, principal, sorted, sugestao)}
         ${(g.historico || []).length ? `<div class="bk-hist-block"><div class="bk-meta font-semibold mb-1">Histórico de trocas (${g.historico.length})</div>
           ${[...g.historico].reverse().slice(0, 8).map((h) =>
             `<div class="bk-hist is-muted">${escapeHtml(new Date(h.data).toLocaleString("pt-BR"))} · ${escapeHtml(h.motivo || "")}</div>`
@@ -733,49 +731,71 @@
     if (open) loadRobo(open, false);
   }
 
+  function roboExcluidos(docId) {
+    try {
+      const v = JSON.parse(localStorage.getItem(`bk-excl:${docId}`) || "[]");
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function roboExcluir(docId, itemId) {
+    const lista = roboExcluidos(docId);
+    if (!lista.includes(String(itemId))) lista.push(String(itemId));
+    localStorage.setItem(`bk-excl:${docId}`, JSON.stringify(lista));
+  }
+
   async function loadRobo(grupo, force) {
     const box = $(`#bk-robo-${grupo.docId} .bk-robo-body`);
     if (!box) return;
     const principal = grupo.produtos?.[grupo.principalItemId];
     if (!principal) return;
-    const cacheKey = `${grupo.docId}:${principal.itemId}:${readGarimpoSettings().precoToleranciaAcimaPct}:${readGarimpoSettings().precoToleranciaAbaixoPct}`;
+    const excluidos = roboExcluidos(grupo.docId);
+    const cacheKey = `${grupo.docId}:${principal.itemId}:${excluidos.join(",")}`;
     if (!force && state.roboCache[cacheKey]) {
       box.innerHTML = state.roboCache[cacheKey];
       return;
     }
-    box.textContent = "Buscando ofertas semelhantes…";
+    box.textContent = "Buscando derivadas…";
     try {
-      const exclude = [principal.itemId, ...(grupo.backupItemIds || [])];
+      const exclude = [principal.itemId, ...(grupo.backupItemIds || []), ...excluidos];
       const r = await api("/api/backup/garimpo-contextual", {
         method: "POST",
         body: JSON.stringify({
           nome: principal.nome,
           apelido: principal.apelido || "",
-          shopId: principal.shopId || "",
           preco: principal.preco,
           excludeItemIds: exclude,
-          ...readGarimpoSettings(),
+          precoToleranciaAcimaPct: 5,
+          comissaoMinBRL: 5,
+          vendasMin: 300,
+          limite: 3,
+          usarIA: true,
+          principal: { imagem: principal.imagem || "" },
         }),
       });
       const ofertas = r.ofertas || [];
-      const html = ofertas.length
-        ? `<p class="bk-meta">Termo “${escapeHtml(r.termoUsado || "")}” · ${ofertas.length} oferta(s)</p>`
-          + ofertas.map((p) => {
-            const mesma = principal.shopId && String(p.shopId || "") === String(principal.shopId);
-            return `<div class="bk-robo-item">
-            ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" />` : `<div class="bk-thumb-ph sm"><i class="fa-solid fa-box"></i></div>`}
+      const avisoIA = r.iaErro
+        ? `<div class="bk-meta">Comparação com IA indisponível (${escapeHtml(r.iaErro)}). Mostrando pelo ranking de comissão.</div>`
+        : "";
+      const html = avisoIA + (ofertas.length
+        ? ofertas.map((p) => {
+            const comR = Number(p.comissao_valor || 0) || (Number(p.preco || 0) * Number(p.comissao_pct || 0)) / 100;
+            const nota = p.nota_ia != null ? `<span class="bk-mini-badge is-com">IA ${Number(p.nota_ia).toFixed(0)}/10</span>` : "";
+            return `<div class="bk-robo-item" style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid #E5E7EB;border-radius:10px">
+            ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" style="width:56px;height:56px;border-radius:8px;object-fit:cover" />` : `<div class="bk-thumb-ph sm"><i class="fa-solid fa-box"></i></div>`}
             <div class="min-w-0" style="flex:1">
-              <div class="bk-robo-badges">
-                <span class="bk-mini-badge ${mesma ? "is-same" : "is-other"}">${mesma ? "Mesma loja" : "Outra loja"}</span>
-                <span class="bk-mini-badge is-com">${Number(p.comissao_pct || 0).toFixed(1)}% comissão</span>
-              </div>
-              <b>${escapeHtml(String(p.nome || "").slice(0, 70))}</b>
-              <div class="bk-meta">${escapeHtml(p.loja || "")} · ${fmt(p.preco)}${p.vendas || p.vendas_shopee ? ` · ${fmtNum(p.vendas || p.vendas_shopee)} vendidos` : ""}</div>
+              <div class="bk-robo-badges">${nota}</div>
+              <b style="font-size:13px">${escapeHtml(String(p.nome || "").slice(0, 70))}</b>
+              <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos · ★ ${Number(p.rating || 0).toFixed(1)}</div>
+              ${p.motivo_ia ? `<div class="bk-meta">${escapeHtml(p.motivo_ia)}</div>` : ""}
             </div>
-            <button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Adicionar nesta</button>
+            <button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button>
+            <button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button>
           </div>`;
           }).join("")
-        : `<div class="bk-meta">Nenhuma oferta na faixa de preço. Ajuste em Configurações.</div>`;
+        : `<div class="bk-meta">Nenhuma derivada com os critérios: até 5% acima do preço, comissão mínima R$ 5, vendas mínimas 300.</div>`);
       state.roboCache[cacheKey] = html;
       state.roboOfertas = state.roboOfertas || {};
       for (const p of ofertas) state.roboOfertas[String(p.itemId)] = p;
@@ -1445,6 +1465,10 @@
         if (act === "toggle-group") {
           state.grupoExpandido = state.grupoExpandido === btn.dataset.gid ? null : btn.dataset.gid;
           await renderGrupos();
+        } else if (act === "toggle-vinc") {
+          state.vincAberto = state.vincAberto || {};
+          state.vincAberto[btn.dataset.gid] = !state.vincAberto[btn.dataset.gid];
+          await renderGrupos();
         } else if (act === "expand-reservas") {
           state.grupoReservasExpanded[btn.dataset.gid] = true;
           await renderGrupos();
@@ -1492,6 +1516,10 @@
           await renderGrupos();
           await refreshStats();
         } else if (act === "robo") {
+          const g = state.grupos.find((x) => x.docId === btn.dataset.gid);
+          if (g) await loadRobo(g, true);
+        } else if (act === "robo-excluir") {
+          roboExcluir(btn.dataset.gid, btn.dataset.item);
           const g = state.grupos.find((x) => x.docId === btn.dataset.gid);
           if (g) await loadRobo(g, true);
         } else if (act === "robo-save") {
