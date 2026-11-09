@@ -5130,7 +5130,7 @@
     if (titleEl) titleEl.textContent = VIEW_LABELS[view] || view;
     if (subEl) {
       subEl.textContent = view === "produtos"
-        ? "Gerencie produtos principais, reservas e oportunidades de substituição em um único lugar."
+        ? "Produtos principais, backups e alertas em um só lugar."
         : "Dados reais da sua conta no período selecionado.";
     }
     const panelTitle = $("#data-panel-title");
