@@ -1466,3 +1466,10 @@
 .bk-split-left .bk-tile.is-main { max-width: 240px; }
 .bk-split-left .bk-tile.is-main img { height: 260px; width: 100%; object-fit: cover; object-position: center 35%; background: #fff; }
 .bk-split-left .bk-tile.is-main .bk-tile-ph { height: 260px; }
+
+/* Vinculadas compactas (abaixo do principal) */
+.bk-vinc-list { display: flex; flex-direction: column; gap: 8px; }
+.bk-vinc-item { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid #E5E7EB; border-radius: 10px; background: #fff; }
+.bk-vinc-item img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.bk-vinc-info { flex: 1; min-width: 0; }
+.bk-vinc-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
