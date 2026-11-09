@@ -1059,17 +1059,51 @@
           <option value="">— Selecione —</option>
           ${livres.map((b) => `<option value="${escapeHtml(b.itemId)}">${escapeHtml(b.apelido || b.nome)} — ${escapeHtml(b.loja || "")}</option>`).join("")}
         </select>
-        <p class="bk-meta mt-2">Ou cadastre um novo link na aba “Cadastrar link” e vincule depois.</p>
         <div class="bk-modal-actions">
           <button type="button" class="btn ghost sm" data-close>Cancelar</button>
           <button type="button" class="btn brand sm" id="bk-add-ok">Vincular</button>
         </div>
+        <div class="bk-modal-sep"><span>ou</span></div>
+        <label class="bk-label">Cole o link do produto Shopee</label>
+        <div class="bk-link-row">
+          <input id="bk-add-link" class="search" type="url" placeholder="https://shopee.com.br/... ou s.shopee.com.br/..." />
+          <button type="button" class="btn brand sm" id="bk-add-link-ok">Buscar e vincular</button>
+        </div>
+        <p class="bk-meta mt-2">A Shopee busca o produto, salva como backup e vincula a este grupo na hora.</p>
         <p class="form-status" id="bk-add-status"></p>
       </div>
     </div>`;
     document.body.insertAdjacentHTML("beforeend", html);
     const modal = $("#bk-modal");
     modal.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => modal.remove()));
+    $("#bk-add-link-ok")?.addEventListener("click", async () => {
+      const status = $("#bk-add-status");
+      const url = ($("#bk-add-link")?.value || "").trim();
+      if (!url) {
+        if (status) { status.className = "form-status err"; status.textContent = "Cole o link do produto"; }
+        return;
+      }
+      try {
+        if (status) { status.className = "form-status"; status.textContent = "Buscando produto na Shopee…"; }
+        const res = await api("/api/backup/lookup", { method: "POST", body: JSON.stringify({ url }) });
+        if (res.grupoId === grupoId) throw new Error("Esse produto já está vinculado a este grupo");
+        if (res.grupoId) throw new Error("Esse produto já está vinculado a outro grupo");
+        if (!res.jaSalvoComoBackup) {
+          await api("/api/backup", { method: "POST", body: JSON.stringify({ produto: res.produto }) });
+        }
+        await api("/api/backup/grupos/add", {
+          method: "POST",
+          body: JSON.stringify({ grupoId, itemId: res.produto.itemId }),
+        });
+        modal.remove();
+        state.grupos = [];
+        await loadBackups();
+        await renderGrupos();
+        await refreshStats();
+      } catch (err) {
+        if (status) { status.className = "form-status err"; status.textContent = err.message; }
+      }
+    });
     $("#bk-add-ok")?.addEventListener("click", async () => {
       const status = $("#bk-add-status");
       try {
