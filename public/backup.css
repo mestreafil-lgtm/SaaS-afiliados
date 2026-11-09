@@ -1478,3 +1478,17 @@
 .bk-vinc-acts { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
 .bk-vinc-acts button:first-child { flex: 1; border: 0; border-radius: 8px; padding: 6px 8px; background: #E4572E; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
 .bk-vinc-acts .bk-icon-btn { padding: 4px 8px; }
+
+/* Ajuste de encaixe: colunas preenchidas, sem espaço vazio */
+.bk-split { grid-template-columns: 280px minmax(0, 1fr); align-items: stretch; gap: 14px; }
+.bk-split-left .bk-tile.is-main { max-width: none; width: 100%; }
+.bk-split-left .bk-tile.is-main img, .bk-split-left .bk-tile.is-main .bk-tile-ph { height: 300px; }
+.bk-split-right { max-height: none; }
+.bk-vinc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.bk-vinc-item { padding: 6px; gap: 3px; }
+.bk-vinc-item img, .bk-vinc-ph { height: 80px; }
+.bk-vinc-name { font-size: 12px; }
+.bk-vinc-price { font-size: 13px; }
+.bk-vinc-item .bk-meta { font-size: 11px; line-height: 1.35; }
+.bk-vinc-acts button:first-child { font-size: 11px; padding: 5px 6px; }
+@media (max-width: 900px) { .bk-split { grid-template-columns: 1fr; } .bk-vinc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
