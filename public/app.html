@@ -925,10 +925,13 @@
               <p id="data-sub">Produtos principais, backups e alertas em um só lugar.</p>
               <div class="bk-status" id="backup-live-status"><span class="bk-dot"></span>Aguardando sincronização</div>
             </div>
-            <button type="button" class="bk-hero-btn js-backup-varrer" id="btn-backup-atualizar">
-              <i class="fa-solid fa-arrows-rotate"></i>
-              <span>Varrer todas as ofertas</span>
-            </button>
+            <div class="bk-hero-actions">
+              <button type="button" class="bk-hero-btn js-backup-varrer" id="btn-backup-atualizar">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span>Varrer todas as ofertas</span>
+              </button>
+              <button type="button" class="bk-hero-btn-novo" id="btn-backup-criar-grupo"><i class="fa-solid fa-plus"></i> Novo grupo</button>
+            </div>
           </div>
 
           <div id="backup-root" class="bk-pro space-y-4">
@@ -937,7 +940,6 @@
               <button type="button" class="bk-kpi" data-k="cobertura"><span class="bk-kpi-label">Cobertura na Shopee</span><strong>—</strong><em>—</em></button>
               <button type="button" class="bk-kpi" data-k="comissao"><span class="bk-kpi-label">Comissão média</span><strong>—</strong><em>—</em></button>
               <button type="button" class="bk-kpi bk-kpi--alert" data-k="rotacao"><span class="bk-kpi-label">Trocar principal</span><strong>—</strong><em>—</em></button>
-              <button type="button" class="bk-kpi bk-kpi--alert" data-k="scan"><span class="bk-kpi-label">Última verificação mais antiga</span><strong>—</strong><em>—</em></button>
             </div>
             <div id="backup-alertas-comissao"></div>
             <p class="bk-kpi-foot" id="backup-kpi-foot"></p>
@@ -945,27 +947,14 @@
 
             <div class="bk-workspace">
             <div class="bk-tabs" id="backup-tabs">
-              <button type="button" class="backup-tab is-active" data-backup-tab="grupos"><i class="fa-solid fa-bullseye"></i> Ninhos/Grupos <span class="count" data-tab-count="grupos">0</span></button>
-              <button type="button" class="backup-tab" data-backup-tab="cadastrar"><i class="fa-solid fa-plus"></i> Cadastrar link</button>
-              <button type="button" class="backup-tab" data-backup-tab="listagem"><i class="fa-solid fa-box-archive"></i> Meus Backups <span class="count" data-tab-count="listagem">0</span></button>
-              <button type="button" class="backup-tab" data-backup-tab="config"><i class="fa-solid fa-gear"></i> Configurações</button>
+              <button type="button" class="backup-tab is-active" data-backup-tab="grupos">Grupos <span class="count" data-tab-count="grupos">0</span></button>
+              <button type="button" class="backup-tab" data-backup-tab="cadastrar">Cadastrar link</button>
+              <button type="button" class="backup-tab" data-backup-tab="listagem">Meus backups <span class="count" data-tab-count="listagem">0</span></button>
+              <button type="button" class="backup-tab" data-backup-tab="config">Configurações</button>
             </div>
 
             <div id="backup-tab-grupos" class="bk-tab-panel space-y-4">
-              <div class="bk-toolbar">
-                <div class="bk-toolbar-search">
-                  <i class="fa-solid fa-magnifying-glass"></i>
-                  <input type="search" id="backup-grupo-search" placeholder="Buscar grupo, produto ou loja" />
-                </div>
-                <div class="bk-toolbar-actions">
-                  <select id="backup-grupo-nicho" class="bk-nicho-select">
-                    <option value="todas">Todos os nichos</option>
-                  </select>
-                  <button type="button" class="bk-btn-dark" id="btn-backup-criar-grupo"><i class="fa-solid fa-plus"></i> Novo grupo</button>
-                </div>
-              </div>
               <div class="bk-section-head">
-                <span class="bk-section-title">Ninhos / Grupos</span>
                 <span class="bk-section-meta" id="backup-grupos-meta"></span>
               </div>
               <div id="backup-grupos-list" class="space-y-3"></div>
