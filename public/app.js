@@ -2991,7 +2991,6 @@
       const el = document.querySelector(sel);
       if (!el) return;
       el.classList.add("status-just-changed");
-      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
       clearTimeout(state._statusFlashTimer);
       state._statusFlashTimer = setTimeout(() => {
         el.classList.remove("status-just-changed");
@@ -3266,12 +3265,36 @@
     };
   }
 
+  /** Guarda a posição de rolagem da janela e de cada container com scroll acima do elemento. */
+  function snapshotScroll(anchor) {
+    const snap = [[window, window.scrollX, window.scrollY]];
+    let node = anchor?.parentElement || null;
+    while (node && node !== document.body) {
+      if (node.scrollHeight > node.clientHeight + 1) snap.push([node, node.scrollLeft, node.scrollTop]);
+      node = node.parentElement;
+    }
+    return snap;
+  }
+
+  function restoreScroll(snap) {
+    if (!snap) return;
+    const apply = () => {
+      for (const [el, x, y] of snap) {
+        if (el === window) window.scrollTo(x, y);
+        else { el.scrollLeft = x; el.scrollTop = y; }
+      }
+    };
+    apply();
+    requestAnimationFrame(apply);
+  }
+
   async function saveSubidOp(subid, partial, opts = {}) {
     const sid = String(subid || "");
     if (isMobileLayout() && state.view === "canais") {
       state.opsSaveFlash = { subid: sid, phase: "saving" };
       paintOpsSaveFlash();
     }
+    const scrollSnap = snapshotScroll(document.activeElement);
     try {
       const body = { subid, ...partial };
       if (partial.status != null && body.status_source == null) {
@@ -3299,7 +3322,7 @@
       }
       paintChannelCounts();
       if (!opts.skipRender) {
-        if (state.view === "canais") renderOpsTable();
+        if (state.view === "canais") { renderOpsTable(); restoreScroll(scrollSnap); }
         else if (state.view === "config" && state.cfgTab === "indefinidos") renderIndefinidos();
         else if (state.view === "dashboard" && state.channel !== "geral") {
           const ch = state.channel;
@@ -3311,6 +3334,7 @@
             renderChannelKpis(ch, k);
           }
           renderSubIdsDash();
+          restoreScroll(scrollSnap);
         }
       }
       if (partial.status != null && !opts.skipRender) {
