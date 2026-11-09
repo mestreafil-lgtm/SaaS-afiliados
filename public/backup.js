@@ -784,10 +784,7 @@
               <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos · ★ ${Number(p.rating || 0).toFixed(1)}</div>
               ${p.motivo_ia ? `<div class="bk-meta">${escapeHtml(p.motivo_ia)}</div>` : ""}
             </div>
-            <div class="bk-robo-acts">${cheio
-              ? ordenados.map((b, i) => `<button type="button" class="bk-btn-troca-robo" data-act="robo-trocar" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}" data-old="${escapeHtml(b.itemId)}">Trocar por ${i + 1}</button>`).join("")
-              : `<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button>`}</div>
-            <button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button>
+            <div class="bk-robo-acts">${cheio ? `<select class="bk-select-troca" aria-label="Substituir backup">${ordenados.map((b, i) => `<option value="${escapeHtml(b.itemId)}">Substituir Backup ${i + 1}</option>`).join("")}</select>` : ""}<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button><button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button></div>
           </div>`;
           }).join("")
         : `<div class="bk-meta">Nenhuma derivada com os critérios: até 5% acima do preço e comissão mínima R$ 5. As vendas aparecem em cada linha para você decidir.</div>`);
@@ -1522,26 +1519,16 @@
           roboExcluir(btn.dataset.gid, btn.dataset.item);
           const g = state.grupos.find((x) => x.docId === btn.dataset.gid);
           if (g) await loadRobo(g, true);
-        } else if (act === "robo-trocar") {
-          const produto = (state.roboOfertas || {})[String(btn.dataset.item || "")];
-          if (!produto) return;
-          await api("/api/backup/grupos/remove-item", {
-            method: "POST",
-            body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: btn.dataset.old }),
-          });
-          await api("/api/backup", { method: "POST", body: JSON.stringify({ produto }) });
-          await api("/api/backup/grupos/add", {
-            method: "POST",
-            body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: produto.itemId }),
-          });
-          state.grupos = [];
-          state.roboCache = {};
-          await loadBackups();
-          await renderGrupos();
-          await refreshStats();
         } else if (act === "robo-save") {
           const produto = (state.roboOfertas || {})[String(btn.dataset.item || "")];
           if (!produto) return;
+          const sel = btn.closest(".bk-robo-item")?.querySelector(".bk-select-troca");
+          if (sel && sel.value) {
+            await api("/api/backup/grupos/remove-item", {
+              method: "POST",
+              body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: sel.value }),
+            });
+          }
           const saved = await api("/api/backup", { method: "POST", body: JSON.stringify({ produto }) });
           await api("/api/backup/grupos/add", {
             method: "POST",
