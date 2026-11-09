@@ -557,15 +557,18 @@
     </article>`;
   }
 
-  function vincCompactHtml(p, grupoId) {
+  function vincCompactHtml(p, grupoId, n) {
     const comR = comissaoBRL(p);
     return `<div class="bk-vinc-item">
-      ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph" style="width:48px;height:48px"><i class="fa-solid fa-box"></i></div>`}
-      <div class="bk-vinc-info">
-        <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
-        <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos</div>
+      <div class="bk-vinc-tag">Backup ${n}</div>
+      ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph bk-vinc-ph"><i class="fa-solid fa-box"></i></div>`}
+      <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
+      <div class="bk-vinc-price">${fmt(p.preco)}</div>
+      <div class="bk-meta"><b>${Number(p.comissao_pct || 0)}%</b> · ${fmt(comR)} · ${fmtNum(p.vendas_shopee || 0)} vendidos</div>
+      <div class="bk-vinc-acts">
+        <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}">Tornar principal</button>
+        <button type="button" class="bk-icon-btn danger" data-act="remove-from-group" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Remover"><i class="fa-solid fa-trash"></i></button>
       </div>
-      <button type="button" class="bk-icon-btn danger" data-act="remove-from-group" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Remover"><i class="fa-solid fa-trash"></i></button>
     </div>`;
   }
 
@@ -573,7 +576,6 @@
     const principal = g.produtos?.[g.principalItemId];
     const backups = (g.backupItemIds || []).map((id) => g.produtos?.[id]).filter(Boolean);
     const open = state.grupoExpandido === g.docId;
-    const vincAberto = !!state.vincAberto?.[g.docId];
     const insights = analisarInsights(principal, backups);
     const sorted = [...backups].sort((a, b) => {
       if (state.criterio === "rating") return Number(b.rating || 0) - Number(a.rating || 0);
@@ -632,37 +634,19 @@
         <div class="bk-split">
           <div class="bk-split-left">
             ${principal ? produtoTile(principal, "Principal", true, g.docId, false) : ""}
-            ${backups.length ? `<button type="button" class="bk-btn-vinc-toggle" data-act="toggle-vinc" data-gid="${escapeHtml(g.docId)}">Ver vinculadas (${backups.length}) ${vincAberto ? "▴" : "▾"}</button>` : ""}
-            ${vincAberto ? `<div class="bk-vinc-list">${sorted.map((p) => vincCompactHtml(p, g.docId)).join("")}<button type="button" class="bk-btn-vinc-toggle" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}">+ Adicionar backup</button></div>` : ""}
           </div>
-          ${principal ? `<div class="bk-robo bk-split-right" id="bk-robo-${escapeHtml(g.docId)}">
-            <div class="bk-robo-head"><span><i class="fa-solid fa-bolt"></i> Robô de Garimpo — ofertas semelhantes</span>
-              <button type="button" class="bk-icon-btn" data-act="robo" data-gid="${escapeHtml(g.docId)}" title="Buscar de novo"><i class="fa-solid fa-rotate"></i></button>
-            </div>
-            <div class="bk-robo-body">Buscando ofertas semelhantes na mesma faixa de preço…</div>
-          </div>` : ""}
+          <div class="bk-split-right">
+            ${principal ? `<div class="bk-robo" id="bk-robo-${escapeHtml(g.docId)}">
+              <div class="bk-robo-head"><span><i class="fa-solid fa-bolt"></i> Robô de Garimpo</span>
+                <button type="button" class="bk-icon-btn" data-act="robo" data-gid="${escapeHtml(g.docId)}" title="Buscar de novo"><i class="fa-solid fa-rotate"></i></button>
+              </div>
+              <div class="bk-robo-body">Buscando ofertas semelhantes…</div>
+            </div>` : ""}
+            ${backups.length ? `<div class="bk-vinc-head"><span>Vinculadas (${backups.length})</span></div>` : ""}
+            <div class="bk-vinc-grid">${[...backups].sort((x, y) => comissaoBRL(y) - comissaoBRL(x)).map((p, i) => vincCompactHtml(p, g.docId, i + 1)).join("")}</div>
+            ${backups.length < 3 ? `<button type="button" class="bk-btn-vinc-toggle" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}">+ Adicionar backup</button>` : ""}
+          </div>
         </div>
-        ${insights.length ? `<div class="bk-advisor">
-          <div class="bk-advisor-title"><i class="fa-solid fa-lightbulb"></i> Contingência Advisor</div>
-          ${insights.map((ins) => `<div class="bk-insight">
-            <div><b>${escapeHtml(ins.titulo)}</b><p>${escapeHtml(ins.mensagem)}</p></div>
-            ${ins.backupId ? `<button type="button" class="bk-btn-rotate" data-act="rotate" data-gid="${escapeHtml(g.docId)}" data-id="${escapeHtml(ins.backupId)}">Rotacionar agora</button>` : ""}
-          </div>`).join("")}
-        </div>` : ""}
-        ${sugestao ? `<div class="bk-sugestao">
-          <div class="bk-advisor-title"><i class="fa-solid fa-lightbulb"></i> Sugestão</div>
-          <div class="bk-insight">
-            <div><b>Trocar por ${escapeHtml(sugestao.apelido || sugestao.nome || "")}</b>
-            <p>Motivo: comissão ${fmt(comissaoBRL(sugestao))} contra ${fmt(comissaoBRL(principal))} do principal.</p></div>
-            <button type="button" class="bk-btn-troca" data-act="swap" data-gid="${escapeHtml(g.docId)}" data-id="${escapeHtml(sugestao.itemId)}">Trocar agora</button>
-          </div>
-        </div>` : ""}
-        ${backups.length ? `<div class="bk-sort-row">
-          <span>Ordenar por:</span>
-          ${[["comissao", "Comissão"], ["rating", "Rating"], ["vendas", "Vendas"]].map(([id, lab]) =>
-            `<button type="button" class="bk-chip ${state.criterio === id ? "is-active" : ""}" data-act="criterio" data-c="${id}">${lab}</button>`
-          ).join("")}
-        </div>` : ""}
         ${(g.historico || []).length ? `<div class="bk-hist-block"><div class="bk-meta font-semibold mb-1">Histórico de trocas (${g.historico.length})</div>
           ${[...g.historico].reverse().slice(0, 8).map((h) =>
             `<div class="bk-hist is-muted">${escapeHtml(new Date(h.data).toLocaleString("pt-BR"))} · ${escapeHtml(h.motivo || "")}</div>`
@@ -758,7 +742,10 @@
     const principal = grupo.produtos?.[grupo.principalItemId];
     if (!principal) return;
     const excluidos = roboExcluidos(grupo.docId);
-    const cacheKey = `${grupo.docId}:${principal.itemId}:${excluidos.join(",")}`;
+    const ordenados = (grupo.backupItemIds || []).map((id) => grupo.produtos?.[id]).filter(Boolean)
+      .sort((a, b) => comissaoBRL(b) - comissaoBRL(a));
+    const cheio = ordenados.length >= 3;
+    const cacheKey = `${grupo.docId}:${principal.itemId}:${excluidos.join(",")}:${ordenados.map((b) => b.itemId).join(",")}`;
     if (!force && state.roboCache[cacheKey]) {
       box.innerHTML = state.roboCache[cacheKey];
       return;
@@ -776,7 +763,7 @@
           precoToleranciaAcimaPct: 5,
           comissaoMinBRL: 5,
           vendasMin: 0,
-          limite: 3,
+          limite: 1,
           usarIA: true,
           principal: { imagem: principal.imagem || "" },
         }),
@@ -797,8 +784,7 @@
               <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos · ★ ${Number(p.rating || 0).toFixed(1)}</div>
               ${p.motivo_ia ? `<div class="bk-meta">${escapeHtml(p.motivo_ia)}</div>` : ""}
             </div>
-            <button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button>
-            <button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button>
+            <div class="bk-robo-acts">${cheio ? `<select class="bk-select-troca" aria-label="Substituir backup">${ordenados.map((b, i) => `<option value="${escapeHtml(b.itemId)}">Substituir Backup ${i + 1}</option>`).join("")}</select>` : ""}<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button><button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button></div>
           </div>`;
           }).join("")
         : `<div class="bk-meta">Nenhuma derivada com os critérios: até 5% acima do preço e comissão mínima R$ 5. As vendas aparecem em cada linha para você decidir.</div>`);
@@ -1471,10 +1457,15 @@
         if (act === "toggle-group") {
           state.grupoExpandido = state.grupoExpandido === btn.dataset.gid ? null : btn.dataset.gid;
           await renderGrupos();
-        } else if (act === "toggle-vinc") {
-          state.vincAberto = state.vincAberto || {};
-          state.vincAberto[btn.dataset.gid] = !state.vincAberto[btn.dataset.gid];
+        } else if (act === "make-principal") {
+          await api("/api/backup/grupos/swap", {
+            method: "POST",
+            body: JSON.stringify({ grupoId: btn.dataset.gid, novoPrincipalItemId: btn.dataset.id, motivo: "Tornado principal manualmente" }),
+          });
+          state.grupos = [];
+          await loadBackups();
           await renderGrupos();
+          await refreshStats();
         } else if (act === "expand-reservas") {
           state.grupoReservasExpanded[btn.dataset.gid] = true;
           await renderGrupos();
@@ -1531,6 +1522,13 @@
         } else if (act === "robo-save") {
           const produto = (state.roboOfertas || {})[String(btn.dataset.item || "")];
           if (!produto) return;
+          const sel = btn.closest(".bk-robo-item")?.querySelector(".bk-select-troca");
+          if (sel && sel.value) {
+            await api("/api/backup/grupos/remove-item", {
+              method: "POST",
+              body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: sel.value }),
+            });
+          }
           const saved = await api("/api/backup", { method: "POST", body: JSON.stringify({ produto }) });
           await api("/api/backup/grupos/add", {
             method: "POST",
