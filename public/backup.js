@@ -1017,17 +1017,56 @@
           <option value="">— Selecione —</option>
           ${livres.map((b) => `<option value="${escapeHtml(b.itemId)}">${escapeHtml(b.apelido || b.nome)} — ${escapeHtml(b.loja || "")}</option>`).join("")}
         </select>
-        <p class="bk-meta mt-2">${livres.length ? "" : "Nenhum produto livre. Cadastre na aba Cadastrar link."}</p>
+        <p class="bk-meta mt-2">${livres.length ? "" : "Nenhum produto livre ainda."}</p>
         <div class="bk-modal-actions">
           <button type="button" class="btn ghost sm" data-close>Cancelar</button>
           <button type="button" class="btn brand sm" id="bk-g-criar">Criar grupo</button>
         </div>
+        <div class="bk-modal-sep"><span>ou</span></div>
+        <label class="bk-label">Cole o link do produto principal</label>
+        <div class="bk-link-row">
+          <input id="bk-g-link" class="search" type="url" placeholder="https://shopee.com.br/... ou s.shopee.com.br/..." />
+          <button type="button" class="btn brand sm" id="bk-g-link-ok">Buscar e criar grupo</button>
+        </div>
+        <p class="bk-meta mt-2">A Shopee busca o produto, salva e usa como principal do grupo.</p>
         <p class="form-status" id="bk-g-status"></p>
       </div>
     </div>`;
     document.body.insertAdjacentHTML("beforeend", html);
     const modal = $("#bk-modal");
     modal.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => modal.remove()));
+    $("#bk-g-link-ok")?.addEventListener("click", async () => {
+      const status = $("#bk-g-status");
+      const nome = ($("#bk-g-nome")?.value || "").trim();
+      const url = ($("#bk-g-link")?.value || "").trim();
+      if (!nome) {
+        if (status) { status.className = "form-status err"; status.textContent = "Informe o nome do grupo"; }
+        return;
+      }
+      if (!url) {
+        if (status) { status.className = "form-status err"; status.textContent = "Cole o link do produto principal"; }
+        return;
+      }
+      try {
+        if (status) { status.className = "form-status"; status.textContent = "Buscando produto na Shopee…"; }
+        const res = await api("/api/backup/lookup", { method: "POST", body: JSON.stringify({ url }) });
+        if (res.grupoId) throw new Error("Esse produto já está em outro grupo");
+        if (!res.jaSalvoComoBackup) {
+          await api("/api/backup", { method: "POST", body: JSON.stringify({ produto: res.produto }) });
+        }
+        await api("/api/backup/grupos", {
+          method: "POST",
+          body: JSON.stringify({ nome, principalItemId: res.produto.itemId }),
+        });
+        modal.remove();
+        state.grupos = [];
+        await loadBackups();
+        await renderGrupos();
+        await refreshStats();
+      } catch (err) {
+        if (status) { status.className = "form-status err"; status.textContent = err.message; }
+      }
+    });
     $("#bk-g-criar")?.addEventListener("click", async () => {
       const status = $("#bk-g-status");
       try {
