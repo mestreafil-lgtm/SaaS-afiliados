@@ -1463,6 +1463,6 @@
 @media (max-width: 900px) { .bk-split { grid-template-columns: 1fr; } .bk-split-right { max-height: none; } }
 
 /* Principal no split: foto com altura limitada, sem ocupar a coluna inteira */
-.bk-split-left .bk-tile.is-main img { height: 300px; width: 100%; object-fit: contain; background: #fff; }
-.bk-split-left .bk-tile.is-main .bk-tile-ph { height: 300px; }
-.bk-split-left .bk-tile.is-main { max-width: 360px; }
+.bk-split-left .bk-tile.is-main { max-width: 240px; }
+.bk-split-left .bk-tile.is-main img { height: 260px; width: 100%; object-fit: cover; object-position: center 35%; background: #fff; }
+.bk-split-left .bk-tile.is-main .bk-tile-ph { height: 260px; }
