@@ -557,9 +557,10 @@
     </article>`;
   }
 
-  function vincCompactHtml(p, grupoId) {
+  function vincCompactHtml(p, grupoId, n) {
     const comR = comissaoBRL(p);
     return `<div class="bk-vinc-item">
+      <div class="bk-vinc-tag">Backup ${n}</div>
       ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph bk-vinc-ph"><i class="fa-solid fa-box"></i></div>`}
       <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
       <div class="bk-vinc-price">${fmt(p.preco)}</div>
@@ -642,8 +643,8 @@
               <div class="bk-robo-body">Buscando ofertas semelhantes…</div>
             </div>` : ""}
             ${backups.length ? `<div class="bk-vinc-head"><span>Vinculadas (${backups.length})</span></div>` : ""}
-            <div class="bk-vinc-grid">${[...backups].sort((x, y) => comissaoBRL(y) - comissaoBRL(x)).map((p) => vincCompactHtml(p, g.docId)).join("")}</div>
-            <button type="button" class="bk-btn-vinc-toggle" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}">+ Adicionar backup</button>
+            <div class="bk-vinc-grid">${[...backups].sort((x, y) => comissaoBRL(y) - comissaoBRL(x)).map((p, i) => vincCompactHtml(p, g.docId, i + 1)).join("")}</div>
+            ${backups.length < 3 ? `<button type="button" class="bk-btn-vinc-toggle" data-act="add-to-group" data-gid="${escapeHtml(g.docId)}">+ Adicionar backup</button>` : ""}
           </div>
         </div>
         ${(g.historico || []).length ? `<div class="bk-hist-block"><div class="bk-meta font-semibold mb-1">Histórico de trocas (${g.historico.length})</div>
@@ -741,7 +742,10 @@
     const principal = grupo.produtos?.[grupo.principalItemId];
     if (!principal) return;
     const excluidos = roboExcluidos(grupo.docId);
-    const cacheKey = `${grupo.docId}:${principal.itemId}:${excluidos.join(",")}`;
+    const ordenados = (grupo.backupItemIds || []).map((id) => grupo.produtos?.[id]).filter(Boolean)
+      .sort((a, b) => comissaoBRL(b) - comissaoBRL(a));
+    const cheio = ordenados.length >= 3;
+    const cacheKey = `${grupo.docId}:${principal.itemId}:${excluidos.join(",")}:${ordenados.map((b) => b.itemId).join(",")}`;
     if (!force && state.roboCache[cacheKey]) {
       box.innerHTML = state.roboCache[cacheKey];
       return;
@@ -780,7 +784,9 @@
               <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos · ★ ${Number(p.rating || 0).toFixed(1)}</div>
               ${p.motivo_ia ? `<div class="bk-meta">${escapeHtml(p.motivo_ia)}</div>` : ""}
             </div>
-            <button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button>
+            <div class="bk-robo-acts">${cheio
+              ? ordenados.map((b, i) => `<button type="button" class="bk-btn-troca-robo" data-act="robo-trocar" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}" data-old="${escapeHtml(b.itemId)}">Trocar por ${i + 1}</button>`).join("")
+              : `<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button>`}</div>
             <button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button>
           </div>`;
           }).join("")
@@ -1516,6 +1522,23 @@
           roboExcluir(btn.dataset.gid, btn.dataset.item);
           const g = state.grupos.find((x) => x.docId === btn.dataset.gid);
           if (g) await loadRobo(g, true);
+        } else if (act === "robo-trocar") {
+          const produto = (state.roboOfertas || {})[String(btn.dataset.item || "")];
+          if (!produto) return;
+          await api("/api/backup/grupos/remove-item", {
+            method: "POST",
+            body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: btn.dataset.old }),
+          });
+          await api("/api/backup", { method: "POST", body: JSON.stringify({ produto }) });
+          await api("/api/backup/grupos/add", {
+            method: "POST",
+            body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: produto.itemId }),
+          });
+          state.grupos = [];
+          state.roboCache = {};
+          await loadBackups();
+          await renderGrupos();
+          await refreshStats();
         } else if (act === "robo-save") {
           const produto = (state.roboOfertas || {})[String(btn.dataset.item || "")];
           if (!produto) return;
