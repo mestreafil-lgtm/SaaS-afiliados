@@ -1509,3 +1509,117 @@
 .bk-modal-sep::before, .bk-modal-sep::after { content: ""; flex: 1; height: 1px; background: #E5E7EB; }
 .bk-link-row { display: flex; gap: 8px; align-items: center; }
 .bk-link-row input { flex: 1; min-width: 0; }
+
+/* ===== Cabeçalho, indicadores e card "Comissão caiu" (layout aprovado) ===== */
+.bk-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 26px;
+  border-radius: 14px;
+  background: #111827;
+  color: #fff;
+}
+.bk-hero h1 { margin: 0; font-size: 24px; font-weight: 700; color: #fff; }
+.bk-hero p { margin: 4px 0 0; font-size: 14px; color: #CBD5E1; }
+.bk-hero .bk-status { margin-top: 8px; font-size: 13px; color: #86EFAC; display: flex; align-items: center; gap: 6px; }
+.bk-hero .bk-dot { width: 7px; height: 7px; border-radius: 999px; background: #86EFAC; display: inline-block; }
+.bk-hero-btn {
+  background: #fff;
+  color: #111827;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.bk-kpi-grid--5 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.bk-kpi {
+  display: block;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 14px;
+  min-width: 0;
+  cursor: pointer;
+  color: #111827;
+}
+.bk-kpi--alert { border-color: #FDBA74; }
+.bk-kpi-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6B7280;
+}
+.bk-kpi--alert .bk-kpi-label { color: #9A3412; }
+.bk-kpi strong { display: block; font-size: 26px; font-weight: 700; margin-top: 6px; color: #111827; }
+.bk-kpi em { display: block; font-style: normal; font-size: 12px; color: #6B7280; margin-top: 4px; }
+.bk-kpi-foot { font-size: 12px; color: #9CA3AF; margin-top: 10px; }
+
+.bk-alertas-comissao {
+  background: #EA580C;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-top: 14px;
+}
+.bk-alertas-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 12px;
+}
+.bk-alertas-count {
+  background: #fff;
+  color: #EA580C;
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.bk-alerta-row {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+.bk-alerta-img { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+.bk-alerta-img--ph { background: #F3F4F6; }
+.bk-alerta-info { flex: 1; min-width: 0; }
+.bk-alerta-nome { font-weight: 600; font-size: 15px; color: #111827; }
+.bk-alerta-val { font-size: 14px; color: #6B7280; margin-top: 2px; }
+.bk-alerta-val b { color: #EA580C; }
+.bk-alerta-ok {
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #111827;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+@media (max-width: 900px) {
+  .bk-kpi-grid--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

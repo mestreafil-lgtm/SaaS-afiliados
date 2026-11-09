@@ -260,6 +260,51 @@
     return `há ${Math.floor(h / 24)}d`;
   }
 
+  const TIPOS_CARD_COMISSAO = ["comissao_caiu", "comissao_zero"];
+
+  function alertasComissaoPendentes(backups) {
+    const itens = [];
+    for (const b of backups) {
+      for (const a of b.alertas || []) {
+        if (!a || !TIPOS_CARD_COMISSAO.includes(a.tipo) || a.visto === true) continue;
+        itens.push({ b, a });
+      }
+    }
+    return itens;
+  }
+
+  function renderAlertasComissao(backups) {
+    const box = $("#backup-alertas-comissao");
+    if (!box) return;
+    const itens = alertasComissaoPendentes(backups);
+    if (!itens.length) {
+      box.innerHTML = "";
+      return;
+    }
+    const linhas = itens.map(({ b, a }) => {
+      const nome = b.apelido || b.nome || "Produto";
+      const img = b.imagem
+        ? `<img class="bk-alerta-img" src="${escapeHtml(b.imagem)}" alt="" loading="lazy" />`
+        : `<div class="bk-alerta-img bk-alerta-img--ph"></div>`;
+      const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
+      const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
+      return `
+        <div class="bk-alerta-row">
+          ${img}
+          <div class="bk-alerta-info">
+            <div class="bk-alerta-nome">${escapeHtml(nome)}</div>
+            <div class="bk-alerta-val"><s>${de}</s> → <b>${para}</b> de comissão</div>
+          </div>
+          <button type="button" class="bk-alerta-ok" data-act="alerta-visto" data-id="${escapeHtml(b.itemId)}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button>
+        </div>`;
+    }).join("");
+    box.innerHTML = `
+      <div class="bk-alertas-comissao">
+        <div class="bk-alertas-head"><i class="fa-solid fa-triangle-exclamation"></i> Comissão caiu <span class="bk-alertas-count">${itens.length}</span></div>
+        ${linhas}
+      </div>`;
+  }
+
   async function refreshStats() {
     const grid = $("#backup-kpi-grid");
     if (grid) grid.classList.remove("is-hidden");
@@ -317,15 +362,13 @@
     const pct = total ? Math.round((okApi / total) * 100) : 0;
     const idadeAntigo = antigo ? Date.now() - antigo : null;
     const idadeNovo = recente ? Date.now() - recente : null;
-    setKpi("backups", String(total), `${emGrupo} em grupo · ${livres} livres`);
-    setKpi("cobertura", String(okApi), `${pct}% retornam no afiliado`);
-    setKpi("fora", String(foraApi), foraApi ? "revisar link" : "nenhum");
-    setKpi("sinais", String(sinais), sinais ? "clique para ver" : "tudo saudável");
-    setKpi("scan", tempoAtrasMs(idadeAntigo), idadeNovo != null ? `novo ${tempoAtrasMs(idadeNovo)}` : "—");
+    setKpi("backups", String(total), `${emGrupo} em grupos · ${livres} livres`);
+    setKpi("cobertura", `${pct}%`, `${okApi} retornam com comissão`);
     setKpi("comissao", fmt(media), topo > 0 ? `topo ${fmt(topo)}` : "—");
     setKpi("rotacao", String(rotacoes), rotacoes ? `${melhorGrupo}: backup rende mais` : "principal é o melhor");
-    setKpi("variantes", String(comFaixa), comFaixa ? `${total ? Math.round((comFaixa / total) * 100) : 0}% dos itens` : "preço único");
-    setKpi("loja", topLojas[0] ? String(topLojas[0][0]).slice(0, 18) : "—", topLojas[0] ? `${topLojas[0][1]} itens` : "—");
+    const diasAntigo = idadeAntigo != null ? Math.floor(idadeAntigo / 86400000) : null;
+    setKpi("scan", diasAntigo != null ? `${diasAntigo} dias` : "—", "rode \"Varrer ofertas\"");
+    renderAlertasComissao(backups);
     const foot = $("#backup-kpi-foot");
     if (foot) {
       const semReserva = grupos.filter((g) => !(g.backupItemIds || []).length).length;
@@ -1330,6 +1373,23 @@
         state.listVisible = 30;
         renderListagem();
       });
+    });
+
+    $("#backup-alertas-comissao")?.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-act='alerta-visto']");
+      if (!btn) return;
+      btn.disabled = true;
+      try {
+        await api("/api/backup/alertas/visto", {
+          method: "POST",
+          body: JSON.stringify({ itemId: btn.dataset.id, tipo: btn.dataset.tipo }),
+        });
+        await loadBackups();
+        await refreshStats();
+      } catch (err) {
+        btn.disabled = false;
+        alert(err.message || String(err));
+      }
     });
 
     $("#backup-root")?.addEventListener("click", (e) => {
