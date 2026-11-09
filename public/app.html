@@ -921,8 +921,8 @@
         <section id="view-data" class="view hidden space-y-5">
           <div class="bk-hero">
             <div>
-              <h1 id="data-title"><i class="fa-solid fa-box-archive"></i> Backup &amp; Contingência Pro</h1>
-              <p id="data-sub">Proteja links, garimpo por histórico real e radar de recompra. Preço e comissão atualizam automaticamente 3×/dia (6h, 14h e 22h BRT).</p>
+              <h1 id="data-title"><i class="fa-solid fa-box-archive"></i> Backup</h1>
+              <p id="data-sub">Produtos principais, backups e alertas em um só lugar.</p>
               <div class="bk-status" id="backup-live-status"><span class="bk-dot"></span>Aguardando sincronização</div>
             </div>
             <button type="button" class="bk-hero-btn js-backup-varrer" id="btn-backup-atualizar">
@@ -932,19 +932,14 @@
           </div>
 
           <div id="backup-root" class="bk-pro space-y-4">
-            <div class="bk-kpi-grid" id="backup-kpi-grid">
+            <div class="bk-kpi-grid bk-kpi-grid--5" id="backup-kpi-grid">
               <button type="button" class="bk-kpi" data-k="backups"><span class="bk-kpi-label">Backups</span><strong>—</strong><em>—</em></button>
-              <button type="button" class="bk-kpi" data-k="cobertura"><span class="bk-kpi-label">Cobertura API</span><strong>—</strong><em>—</em></button>
-              <button type="button" class="bk-kpi" data-k="fora"><span class="bk-kpi-label">Fora do afiliado</span><strong>—</strong><em>—</em></button>
-              <button type="button" class="bk-kpi" data-k="sinais"><span class="bk-kpi-label">Sinais críticos</span><strong>—</strong><em>—</em></button>
-              <button type="button" class="bk-kpi" data-k="scan"><span class="bk-kpi-label">Scan mais antigo</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi" data-k="cobertura"><span class="bk-kpi-label">Cobertura na Shopee</span><strong>—</strong><em>—</em></button>
               <button type="button" class="bk-kpi" data-k="comissao"><span class="bk-kpi-label">Comissão média</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi bk-kpi--alert" data-k="rotacao"><span class="bk-kpi-label">Trocar principal</span><strong>—</strong><em>—</em></button>
+              <button type="button" class="bk-kpi bk-kpi--alert" data-k="scan"><span class="bk-kpi-label">Última verificação mais antiga</span><strong>—</strong><em>—</em></button>
             </div>
-            <div class="bk-kpi-grid bk-kpi-grid--3" id="backup-kpi-row2">
-              <button type="button" class="bk-kpi" data-k="rotacao"><span class="bk-kpi-label">Trocar principal</span><strong>—</strong><em>—</em></button>
-              <button type="button" class="bk-kpi" data-k="variantes"><span class="bk-kpi-label">Variantes com faixa</span><strong>—</strong><em>—</em></button>
-              <button type="button" class="bk-kpi" data-k="loja"><span class="bk-kpi-label">Loja com mais backups</span><strong>—</strong><em>—</em></button>
-            </div>
+            <div id="backup-alertas-comissao"></div>
             <p class="bk-kpi-foot" id="backup-kpi-foot"></p>
             <span class="hidden" id="backup-scan-info"><strong>—</strong></span>
 
