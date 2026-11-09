@@ -145,10 +145,17 @@ async function shopeeGraphqlRaw(appId, secret, query, variables = null, { retrie
         const msg = json.errors.map((e) => `${e.extensions?.code || "?"}: ${e.message || String(e)}`).join("; ");
         const isRateLimit = json.errors.some((e) => String(e.extensions?.code || "") === "10030")
           || /rate limit|quota|throttl/i.test(msg);
+        // 10000 = "System Error" da Shopee: costuma ser passageiro, então tenta de novo
+        const isSystemError = json.errors.some((e) => String(e.extensions?.code || "") === "10000");
         lastErr = new Error(msg);
         if (isRateLimit && attempt <= retries) {
           console.warn(`[shopee] rate limit (10030), retry ${attempt}/${retries} em ${8000 * attempt}ms`);
           await sleep(8000 * attempt);
+          continue;
+        }
+        if (isSystemError && attempt <= retries) {
+          console.warn(`[shopee] erro 10000 (System Error), retry ${attempt}/${retries} em ${3000 * attempt}ms`);
+          await sleep(3000 * attempt);
           continue;
         }
         throw lastErr;
