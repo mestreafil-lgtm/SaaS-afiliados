@@ -377,12 +377,16 @@ function buildAlertas(dadosAtuais, novo) {
     alertas.push({
       tipo: "comissao_zero",
       nivel: "critico",
+      de: comissaoAntiga,
+      para: 0,
       mensagem: "Comissão caiu para 0%. Produto saiu do programa de afiliados.",
     });
-  } else if (comissaoAntiga > 0 && comissaoNova < comissaoAntiga * 0.7) {
+  } else if (comissaoAntiga > 0 && comissaoAntiga - comissaoNova >= 2) {
     alertas.push({
       tipo: "comissao_caiu",
       nivel: "aviso",
+      de: comissaoAntiga,
+      para: comissaoNova,
       mensagem: `Comissão caiu de ${comissaoAntiga}% para ${comissaoNova}%.`,
     });
   } else if (comissaoAntiga > 0 && comissaoNova > comissaoAntiga * 1.3) {
@@ -625,6 +629,62 @@ async function editarBackupMeta(itemId, { apelido, marcadoPrincipal } = {}, user
   return { ok: true };
 }
 
+const TIPOS_ALERTA_COMISSAO = ["comissao_caiu", "comissao_zero"];
+
+// Alertas de queda de comissão ficam pendentes até o usuário marcar "Ciente".
+// Um alerta já marcado como visto não volta enquanto a queda for a mesma.
+function mesclarAlertasComissao(anteriores, novos) {
+  const agora = new Date().toISOString();
+  const antigos = Array.isArray(anteriores) ? anteriores : [];
+  const pendentesAntigos = antigos.filter(
+    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto !== true
+  );
+  const vistosAntigos = antigos.filter(
+    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto === true
+  );
+  const mesmoAlerta = (x, y) => x.tipo === y.tipo && x.de === y.de && x.para === y.para;
+
+  const novosComissao = (novos || [])
+    .filter((a) => TIPOS_ALERTA_COMISSAO.includes(a.tipo))
+    .filter((a) => !vistosAntigos.some((v) => mesmoAlerta(v, a)))
+    .map((a) => {
+      const ja = pendentesAntigos.find((p) => p.tipo === a.tipo);
+      return { ...a, visto: false, criado_em: ja?.criado_em || agora };
+    });
+
+  const pendentesMantidos = pendentesAntigos.filter(
+    (p) => !novosComissao.some((n) => n.tipo === p.tipo)
+  );
+  const outros = (novos || []).filter((a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo));
+  return [...pendentesMantidos, ...novosComissao, ...outros];
+}
+
+async function marcarAlertaVisto(itemId, tipo, userId = requireUserId()) {
+  const supabase = getSupabase();
+  const { data: atual, error } = await supabase
+    .from("product_backups")
+    .select("alertas")
+    .eq("user_id", userId)
+    .eq("item_id", String(itemId))
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!atual) {
+    const err = new Error("Produto não está nos backups");
+    err.code = "not_in_backup";
+    throw err;
+  }
+  const alertas = (Array.isArray(atual.alertas) ? atual.alertas : []).map((a) =>
+    a && a.tipo === tipo ? { ...a, visto: true } : a
+  );
+  const { error: upErr } = await supabase
+    .from("product_backups")
+    .update({ alertas })
+    .eq("user_id", userId)
+    .eq("item_id", String(itemId));
+  if (upErr) throw new Error(upErr.message);
+  return { success: true };
+}
+
 async function atualizarBackup(itemId, userId = requireUserId()) {
   const supabase = getSupabase();
   const { data: atual, error } = await supabase
@@ -661,7 +721,8 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
 
   let novo = normalizeShopeeProduct(node);
   novo = await ensureAffiliateLink(novo);
-  const alertas = buildAlertas(atual, novo);
+  const alertasNovos = buildAlertas(atual, novo);
+  const alertas = mesclarAlertasComissao(atual.alertas, alertasNovos);
   const row = {
     ...rowFromProduto(userId, novo, {
       apelido: atual.apelido,
@@ -1395,6 +1456,7 @@ module.exports = {
   removerBackup,
   editarBackupMeta,
   atualizarBackup,
+  marcarAlertaVisto,
   atualizarBackupsEmLote,
   atualizarGrupoBackup,
   buscarSimilaresDaLoja,
