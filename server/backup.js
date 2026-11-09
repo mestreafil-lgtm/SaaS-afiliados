@@ -1329,6 +1329,14 @@ function termoGarimpo(nome, apelido) {
   return tokens.slice(0, 3).join(" ") || String(nome || "").trim().slice(0, 60);
 }
 
+function comTimeout(promise, ms, mensagem) {
+  let timer;
+  const limite = new Promise((_, rejeita) => {
+    timer = setTimeout(() => rejeita(new Error(mensagem)), ms);
+  });
+  return Promise.race([promise, limite]).finally(() => clearTimeout(timer));
+}
+
 async function garimpoContextual(body = {}, userId = requireUserId()) {
   const termo = termoGarimpo(body.nome, body.apelido);
   if (!termo) return { ofertas: [], termoUsado: "" };
@@ -1357,7 +1365,11 @@ async function garimpoContextual(body = {}, userId = requireUserId()) {
   if (body.usarIA && ofertas.length) {
     try {
       const { compararDerivadasComIA } = require("./claude");
-      const notas = await compararDerivadasComIA({ principal: body.principal || {}, candidatos: ofertas }, userId);
+      const notas = await comTimeout(
+        compararDerivadasComIA({ principal: body.principal || {}, candidatos: ofertas }, userId),
+        25000,
+        "A comparação com IA demorou mais de 25 segundos",
+      );
       const porId = new Map(notas.map((n) => [n.itemId, n]));
       const comNota = ofertas
         .map((p) => ({ ...p, nota_ia: porId.get(String(p.itemId))?.nota ?? null, motivo_ia: porId.get(String(p.itemId))?.motivo || "" }))
