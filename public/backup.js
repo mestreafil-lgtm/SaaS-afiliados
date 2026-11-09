@@ -736,6 +736,46 @@
     localStorage.setItem(`bk-excl:${docId}`, JSON.stringify(lista));
   }
 
+  const ROBO_TTL_MS = 24 * 60 * 60 * 1000;
+
+  function roboCacheKey(grupo) {
+    return `bk-robo-cache:${grupo.docId}:${grupo.principalItemId}`;
+  }
+
+  function readRoboCache(grupo) {
+    try {
+      return JSON.parse(localStorage.getItem(roboCacheKey(grupo)) || "null");
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeRoboCache(grupo, data) {
+    try {
+      localStorage.setItem(roboCacheKey(grupo), JSON.stringify(data));
+    } catch (_) { /* armazenamento cheio ou bloqueado: segue sem cache */ }
+  }
+
+  function roboTempoAtras(ts) {
+    const h = Math.floor((Date.now() - ts) / 3600000);
+    return h < 1 ? "há menos de 1 h" : `há ${h} h`;
+  }
+
+  function roboRowHtml(p, grupo, ordenados, cheio) {
+    const comR = Number(p.comissao_valor || 0) || (Number(p.preco || 0) * Number(p.comissao_pct || 0)) / 100;
+    const nota = p.nota_ia != null ? `<span class="bk-mini-badge is-com">IA ${Number(p.nota_ia).toFixed(0)}/10</span>` : "";
+    return `<div class="bk-robo-item" style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid #E5E7EB;border-radius:10px">
+      ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" style="width:56px;height:56px;border-radius:8px;object-fit:cover" />` : `<div class="bk-thumb-ph sm"><i class="fa-solid fa-box"></i></div>`}
+      <div class="min-w-0" style="flex:1">
+        <div class="bk-robo-badges">${nota}</div>
+        <b style="font-size:13px">${escapeHtml(String(p.nome || "").slice(0, 70))}</b>
+        <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos · ★ ${Number(p.rating || 0).toFixed(1)}</div>
+        ${p.motivo_ia ? `<div class="bk-meta">${escapeHtml(p.motivo_ia)}</div>` : ""}
+      </div>
+      <div class="bk-robo-acts">${cheio ? `<select class="bk-select-troca" aria-label="Substituir backup">${ordenados.map((b, i) => `<option value="${escapeHtml(b.itemId)}">Substituir Backup ${i + 1}</option>`).join("")}</select>` : ""}<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button><button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button></div>
+    </div>`;
+  }
+
   async function loadRobo(grupo, force) {
     const box = $(`#bk-robo-${grupo.docId} .bk-robo-body`);
     if (!box) return;
@@ -745,53 +785,42 @@
     const ordenados = (grupo.backupItemIds || []).map((id) => grupo.produtos?.[id]).filter(Boolean)
       .sort((a, b) => comissaoBRL(b) - comissaoBRL(a));
     const cheio = ordenados.length >= 3;
-    const cacheKey = `${grupo.docId}:${principal.itemId}:${excluidos.join(",")}:${ordenados.map((b) => b.itemId).join(",")}`;
-    if (!force && state.roboCache[cacheKey]) {
-      box.innerHTML = state.roboCache[cacheKey];
-      return;
-    }
-    box.textContent = "Buscando derivadas…";
+    const ja = new Set([principal.itemId, ...(grupo.backupItemIds || []), ...excluidos].map(String));
     try {
-      const exclude = [principal.itemId, ...(grupo.backupItemIds || []), ...excluidos];
-      const r = await api("/api/backup/garimpo-contextual", {
-        method: "POST",
-        body: JSON.stringify({
-          nome: principal.nome,
-          apelido: principal.apelido || "",
-          preco: principal.preco,
-          excludeItemIds: exclude,
-          precoToleranciaAcimaPct: 5,
-          comissaoMinBRL: 5,
-          vendasMin: 0,
-          limite: 1,
-          usarIA: true,
-          principal: { imagem: principal.imagem || "" },
-        }),
-      });
-      const ofertas = r.ofertas || [];
-      const avisoIA = r.iaErro
-        ? `<div class="bk-meta">Comparação com IA indisponível (${escapeHtml(r.iaErro)}). Mostrando pelo ranking de comissão.</div>`
-        : "";
-      const html = avisoIA + (ofertas.length
-        ? ofertas.map((p) => {
-            const comR = Number(p.comissao_valor || 0) || (Number(p.preco || 0) * Number(p.comissao_pct || 0)) / 100;
-            const nota = p.nota_ia != null ? `<span class="bk-mini-badge is-com">IA ${Number(p.nota_ia).toFixed(0)}/10</span>` : "";
-            return `<div class="bk-robo-item" style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid #E5E7EB;border-radius:10px">
-            ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" style="width:56px;height:56px;border-radius:8px;object-fit:cover" />` : `<div class="bk-thumb-ph sm"><i class="fa-solid fa-box"></i></div>`}
-            <div class="min-w-0" style="flex:1">
-              <div class="bk-robo-badges">${nota}</div>
-              <b style="font-size:13px">${escapeHtml(String(p.nome || "").slice(0, 70))}</b>
-              <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos · ★ ${Number(p.rating || 0).toFixed(1)}</div>
-              ${p.motivo_ia ? `<div class="bk-meta">${escapeHtml(p.motivo_ia)}</div>` : ""}
-            </div>
-            <div class="bk-robo-acts">${cheio ? `<select class="bk-select-troca" aria-label="Substituir backup">${ordenados.map((b, i) => `<option value="${escapeHtml(b.itemId)}">Substituir Backup ${i + 1}</option>`).join("")}</select>` : ""}<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button><button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button></div>
-          </div>`;
-          }).join("")
-        : `<div class="bk-meta">Nenhuma derivada com os critérios: até 5% acima do preço e comissão mínima R$ 5. As vendas aparecem em cada linha para você decidir.</div>`);
-      state.roboCache[cacheKey] = html;
+      let cache = readRoboCache(grupo);
+      const fresco = cache && Date.now() - cache.ts < ROBO_TTL_MS;
+      if (force || !fresco) {
+        box.textContent = "Buscando derivadas…";
+        const exclude = [principal.itemId, ...(grupo.backupItemIds || []), ...excluidos];
+        const r = await api("/api/backup/garimpo-contextual", {
+          method: "POST",
+          body: JSON.stringify({
+            nome: principal.nome,
+            apelido: principal.apelido || "",
+            preco: principal.preco,
+            excludeItemIds: exclude,
+            precoToleranciaAcimaPct: 5,
+            comissaoMinBRL: 5,
+            vendasMin: 0,
+            limite: 10,
+            usarIA: true,
+            principal: { imagem: principal.imagem || "" },
+          }),
+        });
+        cache = { ts: Date.now(), ofertas: r.ofertas || [], iaErro: r.iaErro || "" };
+        writeRoboCache(grupo, cache);
+      }
+      const visiveis = (cache.ofertas || []).filter((p) => !ja.has(String(p.itemId)));
       state.roboOfertas = state.roboOfertas || {};
-      for (const p of ofertas) state.roboOfertas[String(p.itemId)] = p;
-      box.innerHTML = html;
+      for (const p of visiveis) state.roboOfertas[String(p.itemId)] = p;
+      const aviso = cache.iaErro
+        ? `<div class="bk-meta">Comparação com IA indisponível (${escapeHtml(cache.iaErro)}). Mostrando pelo ranking de comissão.</div>`
+        : "";
+      const rodape = `<div class="bk-meta">Busca ${roboTempoAtras(cache.ts)} · ${visiveis.length} na fila</div>`;
+      const corpo = visiveis.length
+        ? roboRowHtml(visiveis[0], grupo, ordenados, cheio)
+        : `<div class="bk-meta">Nenhuma derivada nova com os critérios: até 5% acima do preço e comissão mínima R$ 5. Use o botão de atualizar para buscar de novo.</div>`;
+      box.innerHTML = aviso + corpo + rodape;
     } catch (err) {
       box.innerHTML = `<div class="bk-error">${escapeHtml(err.message)}</div>`;
     }
