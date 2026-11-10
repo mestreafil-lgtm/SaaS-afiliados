@@ -27,7 +27,7 @@ function horaBrt(ms) {
 
 function textosDoAviso(tipo, valorFmt, hora) {
   if (tipo === "inicio") {
-    return { title: "Comissão total Shopee · começou a atualizar", body: `${hora} · R$ ${valorFmt} até agora` };
+    return { title: "Comissão total Shopee · começou", body: `${hora} · R$ ${valorFmt} até agora` };
   }
   if (tipo === "fim") {
     return { title: "Comissão total Shopee · terminou", body: `${hora} · R$ ${valorFmt} no total` };
