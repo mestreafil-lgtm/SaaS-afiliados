@@ -1,11 +1,12 @@
 "use strict";
 
 /**
- * Avisa no celular quando a Shopee começa, termina ou volta a atualizar a comissão de ontem (BRT).
+ * Notifica o usuário quando a comissão de ontem (BRT) chega.
  *
- * Estado do dia fica em push_notify_state (kind 'sinal-estado').
- * Cada aviso enviado fica em push_notify_log (uma linha por aviso, com a hora).
- * A regra de decisão está em shopeeSinal.js (função pura, testada).
+ * Dedup: nunca reenvia se a comissão não mexeu ou caiu (pedido cancelado etc.).
+ * Reenvia quando a comissão SUBIU de forma significativa (≥ R$ 1,00 OU ≥ 5%)
+ * e passou o rate limit de 20 min desde o último push, para acompanhar
+ * pedidos pendentes que vão caindo durante a janela da manhã.
  */
 
 const { getSupabaseAdmin, runWithUser } = require("./auth");
@@ -13,85 +14,87 @@ const { buildDashboard } = require("./metrics");
 const { shopeeEndDate } = require("./brtDates");
 const { sendToUser } = require("./pushNotify");
 const { buildCommissionPush, getPushBaseUrl } = require("./pushPayload");
-const { decidirSinal, estadoInicial } = require("./shopeeSinal");
 
-const KIND_ESTADO = "sinal-estado";
-
-function horaBrt(ms) {
-  return new Date(ms).toLocaleTimeString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).replace(":", "h");
+function fingerprint({ com, lucro, pedidos }) {
+  return `${Number(com || 0).toFixed(2)}|${Number(lucro || 0).toFixed(2)}|${Number(pedidos || 0)}`;
 }
 
-function textosDoAviso(tipo, valorFmt, hora) {
-  if (tipo === "inicio") {
-    return { title: "Comissão total Shopee · começou", body: `${hora} · R$ ${valorFmt} até agora` };
-  }
-  if (tipo === "fim") {
-    return { title: "Comissão total Shopee · terminou", body: `${hora} · R$ ${valorFmt} no total` };
-  }
-  return { title: "Comissão total Shopee atualizada novamente", body: `${hora} · R$ ${valorFmt} · valor corrigido` };
+function parseFp(fp) {
+  const [com, lucro, pedidos] = String(fp || "0|0|0").split("|").map(Number);
+  return {
+    com: Number.isFinite(com) ? com : 0,
+    lucro: Number.isFinite(lucro) ? lucro : 0,
+    pedidos: Number.isFinite(pedidos) ? pedidos : 0,
+  };
 }
 
-async function carregarEstado(userId, dateKey) {
+const RESEND_MIN_INTERVAL_MS = 20 * 60 * 1000; // 20 min entre reenvios no mesmo dia
+const RESEND_MIN_ABS = 1.0; // reenviar se com subiu ≥ R$ 1,00
+const RESEND_MIN_PCT = 0.05; // ou ≥ 5%
+
+/**
+ * Decide se o push de hoje para `dateKey` pode disparar.
+ * - sem registro ainda: dispara.
+ * - já disparou mas a comissão SUBIU de forma significativa e passou o rate limit: dispara de novo.
+ * - caso contrário: bloqueia.
+ */
+async function alreadyNotified(userId, dateKey, newCom) {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from("push_notify_state")
-    .select("fingerprint")
+    .select("fingerprint, notified_at")
     .eq("user_id", userId)
-    .eq("kind", KIND_ESTADO)
+    .eq("kind", "comissao-ontem")
     .eq("date_key", dateKey)
     .maybeSingle();
   if (error) {
-    console.warn("[push] estado read:", error.message);
-    return { estado: estadoInicial(), ok: false };
+    // Tabela pode não existir ainda — não bloqueia o push
+    console.warn("[push] dedup read:", error.message);
+    return { blocked: false, reason: "no_state_table" };
   }
-  if (!data || !data.fingerprint) return { estado: estadoInicial(), ok: true };
-  try {
-    return { estado: { ...estadoInicial(), ...JSON.parse(data.fingerprint) }, ok: true };
-  } catch {
-    return { estado: estadoInicial(), ok: true };
+  if (!data) return { blocked: false, reason: "first" };
+
+  const prev = parseFp(data.fingerprint);
+  const nowCom = Number(newCom || 0);
+  const delta = nowCom - prev.com;
+  const grew = delta >= RESEND_MIN_ABS || (prev.com > 0 && delta / prev.com >= RESEND_MIN_PCT);
+  if (!grew) {
+    return { blocked: true, reason: `no_growth prev=${prev.com} new=${nowCom}` };
   }
+
+  const lastMs = data.notified_at ? Date.parse(data.notified_at) : 0;
+  const sinceMs = Date.now() - lastMs;
+  if (lastMs && sinceMs < RESEND_MIN_INTERVAL_MS) {
+    return { blocked: true, reason: `too_recent ${Math.round(sinceMs / 1000)}s` };
+  }
+
+  return { blocked: false, reason: `grew prev=${prev.com} new=${nowCom} delta=${delta.toFixed(2)}` };
 }
 
-async function salvarEstado(userId, dateKey, estado) {
+async function markNotified(userId, dateKey, fp) {
   const sb = getSupabaseAdmin();
   const { error } = await sb.from("push_notify_state").upsert(
     {
       user_id: userId,
-      kind: KIND_ESTADO,
+      kind: "comissao-ontem",
       date_key: dateKey,
-      fingerprint: JSON.stringify(estado),
+      fingerprint: fp,
       notified_at: new Date().toISOString(),
     },
     { onConflict: "user_id,kind,date_key" },
   );
-  if (error) console.warn("[push] estado write:", error.message);
-}
-
-async function registrarAviso(userId, dateKey, tipo, valor, emMs) {
-  const sb = getSupabaseAdmin();
-  const { error } = await sb.from("push_notify_log").insert({
-    user_id: userId,
-    date_key: dateKey,
-    tipo,
-    valor,
-    notificado_em: new Date(emMs).toISOString(),
-  });
-  if (error) console.warn("[push] log write:", error.message);
+  if (error) console.warn("[push] dedup write:", error.message);
 }
 
 /**
  * @param {string} userId
- * @param {{ email?: string, baseUrl?: string, req?: object, agoraMs?: number }} [opts]
+ * @param {{ email?: string, baseUrl?: string, force?: boolean, req?: object }} [opts]
  */
 async function notifyYesterdayCommission(userId, opts = {}) {
   const yesterday = shopeeEndDate();
   const email = opts.email || "";
   const baseUrl = opts.baseUrl || getPushBaseUrl(opts.req);
-  const agoraMs = Number(opts.agoraMs || Date.now());
+  const force = !!opts.force;
 
   let com = 0;
   let lucro = 0;
@@ -111,53 +114,53 @@ async function notifyYesterdayCommission(userId, opts = {}) {
     pedidos = Number(dash.kpis?.pedidos || 0);
   });
 
-  const { estado: anterior, ok } = await carregarEstado(userId, yesterday);
-  if (!ok) {
-    console.log(`[push] skip ${email || userId}: sem leitura do estado (${yesterday})`);
-    return { sent: false, reason: "no_state", date: yesterday, com, lucro, venda, pedidos };
+  if (com <= 0) {
+    console.log(`[push] skip ${email || userId}: comissão ontem (${yesterday}) = 0`);
+    return { sent: false, reason: "com_zero", date: yesterday, com, lucro, venda, pedidos };
   }
 
-  const { estado, notificar } = decidirSinal(anterior, com, pedidos, agoraMs);
-
-  if (!notificar) {
-    await salvarEstado(userId, yesterday, estado);
-    console.log(`[push] sem aviso ${email || userId}: ${yesterday} com=${com} pedidos=${pedidos}`);
-    return { sent: false, reason: "sem_aviso", date: yesterday, com, lucro, venda, pedidos };
+  const fp = fingerprint({ com, lucro, pedidos });
+  if (!force) {
+    const dedup = await alreadyNotified(userId, yesterday, com);
+    if (dedup.blocked) {
+      console.log(`[push] skip ${email || userId}: ${yesterday} ${dedup.reason}`);
+      return { sent: false, reason: dedup.reason, date: yesterday, com, lucro, venda, pedidos };
+    }
+    console.log(`[push] dedup pass ${email || userId}: ${yesterday} ${dedup.reason}`);
   }
 
-  const { title, body } = textosDoAviso(notificar.tipo, buildCommissionPush({ com: notificar.valor, date: yesterday }).comFmt, horaBrt(notificar.em));
-  const payload = {
-    ...buildCommissionPush({ com: notificar.valor, lucro, venda, pedidos, date: yesterday, baseUrl }),
-    title,
-    body,
-    tag: `comissao-${notificar.tipo}-${yesterday}`,
-  };
+  const payload = buildCommissionPush({
+    com,
+    lucro,
+    venda,
+    pedidos,
+    date: yesterday,
+    baseUrl,
+  });
 
+  // Aquece o banner na Vercel antes do celular tentar baixar
   if (payload.image) {
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 15000);
       await fetch(payload.image, { signal: ctrl.signal, cache: "no-cache" });
       clearTimeout(t);
+      console.log("[push] banner aquecido");
     } catch (e) {
       console.warn("[push] banner warm falhou:", e.message || e);
     }
   }
 
   const results = await sendToUser(userId, payload);
+  const subCount = Array.isArray(results) ? results.length : 0;
   if (!results) {
     console.warn(`[push] não enviado ${email || userId}: VAPID ausente ou sem subscription`);
     return { sent: false, reason: "no_vapid_or_subs", date: yesterday, com, lucro, venda, pedidos };
   }
 
-  if (!results.some((result) => result.status === "fulfilled")) {
-    return { sent: false, reason: "delivery_failed", date: yesterday, com, lucro, venda, pedidos };
-  }
-
-  await salvarEstado(userId, yesterday, estado);
-  await registrarAviso(userId, yesterday, notificar.tipo, notificar.valor, notificar.em);
-  console.log(`[push] enviado ${email || userId}: ${yesterday} ${notificar.tipo} com=${notificar.valor}`);
-  return { sent: true, tipo: notificar.tipo, date: yesterday, com, lucro, venda, pedidos, subs: results.length };
+  await markNotified(userId, yesterday, fp);
+  console.log(`[push] enviado ${email || userId}: ${yesterday} com=${com} lucro=${lucro} venda=${venda} subs=${subCount}`);
+  return { sent: true, date: yesterday, com, lucro, venda, pedidos, subs: subCount };
 }
 
-module.exports = { notifyYesterdayCommission, horaBrt, textosDoAviso };
+module.exports = { notifyYesterdayCommission, fingerprint };
