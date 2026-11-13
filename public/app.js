@@ -5309,10 +5309,60 @@
     }
   }
 
+  /* Aviso de ROI Meta: campanha (SubID do canal Meta) que passou de abaixo de 100% para 100% ou mais
+     no período selecionado. Só comissão e investimento Meta; o bônus mensal fica fora. */
+  const ROI_AVISO_KEY = "roi_meta_aviso_v1";
+  function roiMetaSemBonus(r) {
+    const inv = Number(r?.inv_meta || 0) * (1 + currentTaxRates().meta);
+    if (!(inv > 0)) return null;
+    const lucro = Number(r.comissao || 0) * (1 - currentTaxRates().gov) - inv;
+    return (lucro / inv) * 100;
+  }
+
+  function mostrarAvisoRoiMeta(itens) {
+    let el = document.getElementById("roi-meta-aviso");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "roi-meta-aviso";
+      el.setAttribute("role", "status");
+      el.style.cssText = "margin:0 0 12px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:14px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px";
+      const view = document.getElementById("view-dashboard");
+      if (view) view.prepend(el);
+    }
+    const fmtRoi = (v) => v.toFixed(1).replace(".", ",") + "%";
+    const linhas = itens.map((i) => `<div><b>${escapeHtml(String(i.subid || "—"))}</b> bateu ROI de 100% no período (agora ${fmtRoi(i.roi)})</div>`).join("");
+    el.innerHTML = `<div style="width:30px;height:30px;border-radius:99px;background:#4f46e5;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none">✓</div>
+      <div style="flex:1;min-width:0;font-size:13px;color:#0f172a">${linhas}<div style="font-size:12px;color:#475569;margin-top:4px">Aviso de ROI da campanha Meta. Não inclui bônus.</div></div>
+      <button type="button" aria-label="Fechar aviso" style="border:0;background:transparent;color:#64748b;font-size:18px;line-height:1;cursor:pointer">×</button>`;
+    el.querySelector("button").onclick = () => el.remove();
+  }
+
+  function checarAvisoRoiMeta(dash) {
+    if ((state.channel || "") !== "meta") return;
+    const periodo = ($("#start-date")?.value || "") + "|" + ($("#end-date")?.value || "");
+    let store = {};
+    try { store = JSON.parse(localStorage.getItem(ROI_AVISO_KEY) || "{}"); } catch (_) { store = {}; }
+    const prefixo = periodo + "|";
+    const novosStore = {};
+    Object.keys(store).forEach((k) => { if (k.startsWith(prefixo)) novosStore[k] = store[k]; });
+    const disparar = [];
+    (dash?.subIds || []).filter((r) => (r.canal || "") === "meta").forEach((r) => {
+      const roi = roiMetaSemBonus(r);
+      if (roi == null) return;
+      const chave = prefixo + String(r.subid || "");
+      const anterior = novosStore[chave];
+      if (anterior != null && anterior < 100 && roi >= 100) disparar.push({ subid: r.subid, roi });
+      novosStore[chave] = roi;
+    });
+    try { localStorage.setItem(ROI_AVISO_KEY, JSON.stringify(novosStore)); } catch (_) {}
+    if (disparar.length) mostrarAvisoRoiMeta(disparar);
+  }
+
   function applyDash(dash, { cached, userTriggered } = {}) {
     state.dash = dash;
     state.subidPage = 1;
     applyChannelView();
+    try { checarAvisoRoiMeta(dash); } catch (_) {}
     if (state.view === "canais") renderOpsTable();
     if (state.view === "config" && state.cfgTab === "indefinidos") renderIndefinidos();
     const when = dash.syncedAt ? new Date(dash.syncedAt).toLocaleString("pt-BR") : "—";
