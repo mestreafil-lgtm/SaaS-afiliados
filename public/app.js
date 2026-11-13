@@ -5319,8 +5319,13 @@
     return (lucro / inv) * 100;
   }
 
-  function mostrarAvisoRoiMeta(itens) {
+  let filaAvisosRoi = [];
+  function desenharAvisoRoiMeta() {
     let el = document.getElementById("roi-meta-aviso");
+    if (!filaAvisosRoi.length) {
+      if (el) el.remove();
+      return;
+    }
     if (!el) {
       el = document.createElement("div");
       el.id = "roi-meta-aviso";
@@ -5329,12 +5334,22 @@
       const view = document.getElementById("view-dashboard");
       if (view) view.prepend(el);
     }
+    const atual = filaAvisosRoi[0];
     const fmtRoi = (v) => v.toFixed(1).replace(".", ",") + "%";
-    const linhas = itens.map((i) => `<div><b>${escapeHtml(String(i.subid || "—"))}</b> bateu ROI de 100% no período (agora ${fmtRoi(i.roi)})</div>`).join("");
+    const restantes = filaAvisosRoi.length - 1;
+    const rodape = restantes > 0 ? `Mais ${restantes} aviso(s) depois deste.` : "Último aviso.";
     el.innerHTML = `<div style="width:30px;height:30px;border-radius:99px;background:#4f46e5;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none">✓</div>
-      <div style="flex:1;min-width:0;font-size:13px;color:#0f172a">${linhas}<div style="font-size:12px;color:#475569;margin-top:4px">Aviso de ROI da campanha Meta. Não inclui bônus.</div></div>
+      <div style="flex:1;min-width:0;font-size:13px;color:#0f172a"><div><b>${escapeHtml(String(atual.subid || "—"))}</b> bateu ROI de 100% no período (agora ${fmtRoi(atual.roi)})</div><div style="font-size:12px;color:#475569;margin-top:4px">Aviso de ROI da campanha Meta. Não inclui bônus. ${rodape}</div></div>
       <button type="button" aria-label="Fechar aviso" style="border:0;background:transparent;color:#64748b;font-size:18px;line-height:1;cursor:pointer">×</button>`;
-    el.querySelector("button").onclick = () => el.remove();
+    el.querySelector("button").onclick = () => {
+      filaAvisosRoi.shift();
+      desenharAvisoRoiMeta();
+    };
+  }
+
+  function mostrarAvisoRoiMeta(itens) {
+    filaAvisosRoi = filaAvisosRoi.concat(itens);
+    desenharAvisoRoiMeta();
   }
 
   function checarAvisoRoiMeta(dash) {
