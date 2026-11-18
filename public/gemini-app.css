@@ -6186,3 +6186,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
   }
 }
 
+
+/* Backup (validado): mesmo tamanho do Status; Validado em laranja do sistema */
+.op-validado-select.v-sim { color: #f97316; border-color: rgba(249, 115, 22, 0.5); font-weight: 700; }
+html.dark .op-validado-select.v-sim { color: #fb923c; }

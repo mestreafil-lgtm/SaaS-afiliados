@@ -2985,7 +2985,7 @@
   function validadoSelectHtml(subid, validado) {
     const v = validado === "sim" || validado === "nao" ? validado : "";
     const sid = escapeHtml(String(subid));
-    return `<select class="op-select op-validado-select v-${v || "vazio"}" data-op="validado" data-subid="${sid}" title="Marque se este SubID está validado">
+    return `<select class="op-select op-status-select op-validado-select v-${v || "vazio"}" data-op="validado" data-subid="${sid}" title="Marque se este SubID está validado">
       <option value="" ${v === "" ? "selected" : ""}></option>
       <option value="sim" ${v === "sim" ? "selected" : ""}>Validado</option>
     </select>`;
