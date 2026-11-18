@@ -771,13 +771,19 @@ async function atualizarTodosBackupsDoUsuario(userId, { maxAgeHours = 0 } = {}) 
   const supabase = getSupabase();
   let q = supabase
     .from("product_backups")
-    .select("item_id, ultima_verificacao")
+    .select("item_id, ultima_verificacao, alertas")
     .eq("user_id", userId);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   const limite = Date.now() - maxAgeHours * 3600 * 1000;
+  // Última tentativa: a conferência bem-sucedida ou a última vez que a Shopee não devolveu o produto.
+  const ultimaTentativa = (r) => {
+    const naoEnc = (Array.isArray(r.alertas) ? r.alertas : []).find((a) => a && a.tipo === "nao_encontrado");
+    const datas = [r.ultima_verificacao, naoEnc?.criado_em].filter(Boolean).map((d) => new Date(d).getTime());
+    return datas.length ? Math.max(...datas) : 0;
+  };
   const pendentes = (data || []).filter(
-    (r) => !maxAgeHours || !r.ultima_verificacao || new Date(r.ultima_verificacao).getTime() < limite
+    (r) => !maxAgeHours || !ultimaTentativa(r) || ultimaTentativa(r) < limite
   );
   if (!pendentes.length) return { total: 0, ok: 0 };
   const todos = pendentes.map((r) => String(r.item_id));
