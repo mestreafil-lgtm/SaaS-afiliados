@@ -381,7 +381,7 @@ function buildAlertas(dadosAtuais, novo) {
       para: 0,
       mensagem: "Comissão caiu para 0%. Produto saiu do programa de afiliados.",
     });
-  } else if (comissaoAntiga > 0 && comissaoAntiga - comissaoNova >= 2) {
+  } else if (comissaoAntiga > 0 && comissaoNova > 0 && comissaoAntiga - comissaoNova > 0) {
     alertas.push({
       tipo: "comissao_caiu",
       nivel: "aviso",
@@ -655,18 +655,147 @@ function mesclarAlertasComissao(anteriores, novos) {
   const pendentesMantidos = pendentesAntigos.filter(
     (p) => !novosComissao.some((n) => n.tipo === p.tipo)
   );
-  const outros = (novos || []).filter((a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo));
-  return [...pendentesMantidos, ...novosComissao, ...outros];
+  // Fila do Robô de Garimpo é guardada na rodada diária; não some ao atualizar o produto.
+  const sugestoesPendentes = antigos.filter((a) => a && (a.tipo === "robo_fila" || a.tipo === "robo_excluido"));
+  const outros = (novos || []).filter(
+    (a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.tipo !== "robo_fila" && a.tipo !== "robo_excluido"
+  );
+  return [...pendentesMantidos, ...novosComissao, ...sugestoesPendentes, ...outros];
 }
 
-async function atualizarTodosBackupsDoUsuario(userId) {
+// Roda o Robô de Garimpo de cada grupo (mesmos critérios da tela) uma vez por dia e guarda
+// a fila no principal. A tela mostra uma oferta por vez, como já funciona hoje.
+
+// Guarda no servidor que a oferta foi excluída no robô, para ela não voltar na fila.
+async function registrarRoboExcluido(grupoId, itemId, comissaoPct = 0, userId = requireUserId()) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  const g = await carregarGrupoComProdutos(grupoId, userId);
+  const principalId = String(g.principalItemId || "");
+  if (!principalId) throw new Error("Grupo sem principal");
+  const { data: principal, error } = await supabase
     .from("product_backups")
-    .select("item_id")
-    .eq("user_id", userId);
+    .select("alertas")
+    .eq("user_id", userId)
+    .eq("item_id", principalId)
+    .maybeSingle();
   if (error) throw new Error(error.message);
-  const todos = (data || []).map((r) => String(r.item_id));
+  const atuais = Array.isArray(principal?.alertas) ? principal.alertas : [];
+  const excluidos = atuais.filter((a) => a && a.tipo === "robo_excluido");
+  const outros = atuais.filter((a) => a && a.tipo !== "robo_excluido");
+  const novo = { tipo: "robo_excluido", itemId: String(itemId), ts: Date.now(), comissao_pct: Number(comissaoPct || 0) };
+  const lista = [...excluidos.filter((a) => String(a.itemId) !== String(itemId)), novo].slice(-300);
+  // Tira também da fila guardada.
+  const fila = outros.map((a) => (a && a.tipo === "robo_fila"
+    ? { ...a, ofertas: (a.ofertas || []).filter((o) => String(o.itemId) !== String(itemId)) }
+    : a));
+  const { error: upErr } = await supabase.from("product_backups")
+    .update({ alertas: [...fila, ...lista] })
+    .eq("user_id", userId).eq("item_id", principalId);
+  if (upErr) throw new Error(upErr.message);
+  return { success: true };
+}
+
+async function buscarSugestoesDiarias(userId = requireUserId()) {
+  const supabase = getSupabase();
+  const { data: grupos, error: gErr } = await supabase
+    .from("product_backup_grupos")
+    .select("id, principal_item_id")
+    .eq("user_id", userId);
+  if (gErr) throw new Error(gErr.message);
+  let total = 0;
+  for (const g of grupos || []) {
+    const { data: membros } = await supabase
+      .from("product_backups")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("grupo_id", g.id);
+    const principal = (membros || []).find((m) => String(m.item_id) === String(g.principal_item_id));
+    if (!principal) continue;
+
+    const excluidosAntes = {};
+    for (const a of Array.isArray(principal.alertas) ? principal.alertas : []) {
+      if (a && a.tipo === "robo_excluido") {
+        // Exclusões antigas sem comissão registrada continuam bloqueadas (Infinity).
+        excluidosAntes[String(a.itemId)] = a.comissao_pct == null ? Infinity : Number(a.comissao_pct);
+      }
+    }
+    const exclude = (membros || []).map((m) => String(m.item_id));
+    const excluidosComissao = {};
+    for (const id of Object.keys(excluidosAntes)) {
+      excluidosComissao[id] = excluidosAntes[id] === Infinity ? null : excluidosAntes[id];
+    }
+    let resultado;
+    try {
+      resultado = await garimpoContextual({
+        nome: principal.nome,
+        apelido: principal.apelido || "",
+        preco: principal.preco,
+        excludeItemIds: exclude,
+        precoToleranciaAcimaPct: 5,
+        comissaoMinBRL: 5,
+        vendasMin: 0,
+        limite: 10,
+        teto: 30,
+        excluidosComissao,
+        usarIA: true,
+        principal: { imagem: principal.imagem || "" },
+      }, userId);
+    } catch (err) {
+      console.warn("[backup] garimpo diário falhou:", err.message);
+      // Guarda o motivo da falha para a linha de status do grupo.
+      const outrosFalha = (Array.isArray(principal.alertas) ? principal.alertas : []).filter(
+        (a) => a && a.tipo !== "robo_fila" && a.tipo !== "similar_novo"
+      );
+      await supabase.from("product_backups").update({
+        alertas: [...outrosFalha, { tipo: "robo_fila", ts: Date.now(), erro: String(err.message || "erro"), termo: "", iaErro: "", ofertas: [] }],
+      }).eq("user_id", userId).eq("item_id", String(principal.item_id));
+      continue;
+    }
+    // Excluídas só voltam se a comissão subiu em relação à que tinha na exclusão.
+    const ofertasValidas = (resultado.ofertas || []).filter((o) => {
+      const id = String(o.itemId);
+      if (!(id in excluidosAntes)) return true;
+      return Number(o.comissao_pct || 0) > excluidosAntes[id];
+    });
+    const fila = {
+      tipo: "robo_fila",
+      ts: Date.now(),
+      termo: resultado.termoUsado || "",
+      erro: "",
+      iaErro: resultado.iaErro || "",
+      ofertas: ofertasValidas.slice(0, 10),
+    };
+    const outros = (Array.isArray(principal.alertas) ? principal.alertas : []).filter(
+      (a) => a && a.tipo !== "robo_fila" && a.tipo !== "similar_novo"
+    );
+    await supabase.from("product_backups").update({ alertas: [...outros, fila] })
+      .eq("user_id", userId).eq("item_id", String(principal.item_id));
+    total += fila.ofertas.length;
+  }
+  return { sugestoes: total };
+}
+
+// maxAgeHours: só verifica os que não foram conferidos nas últimas N horas (usado nas rodadas frequentes).
+async function atualizarTodosBackupsDoUsuario(userId, { maxAgeHours = 0 } = {}) {
+  const supabase = getSupabase();
+  let q = supabase
+    .from("product_backups")
+    .select("item_id, ultima_verificacao, alertas")
+    .eq("user_id", userId);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const limite = Date.now() - maxAgeHours * 3600 * 1000;
+  // Última tentativa: a conferência bem-sucedida ou a última vez que a Shopee não devolveu o produto.
+  const ultimaTentativa = (r) => {
+    const naoEnc = (Array.isArray(r.alertas) ? r.alertas : []).find((a) => a && a.tipo === "nao_encontrado");
+    const datas = [r.ultima_verificacao, naoEnc?.criado_em].filter(Boolean).map((d) => new Date(d).getTime());
+    return datas.length ? Math.max(...datas) : 0;
+  };
+  const pendentes = (data || []).filter(
+    (r) => !maxAgeHours || !ultimaTentativa(r) || ultimaTentativa(r) < limite
+  );
+  if (!pendentes.length) return { total: 0, ok: 0 };
+  const todos = pendentes.map((r) => String(r.item_id));
   if (!todos.length) return { total: 0, ok: 0 };
   // Principais primeiro, depois as reservas (backups)
   const { data: grupos, error: gErr } = await supabase
@@ -680,7 +809,8 @@ async function atualizarTodosBackupsDoUsuario(userId) {
     ...todos.filter((id) => !principais.has(id)),
   ];
   const results = await atualizarBackupsEmLote(ids, userId);
-  return { total: ids.length, ok: results.filter((r) => r.ok).length };
+  const avisos = results.flatMap((r) => r.novosAvisos || []);
+  return { total: ids.length, ok: results.filter((r) => r.ok).length, avisos };
 }
 
 async function marcarAlertaVisto(itemId, tipo, userId = requireUserId()) {
@@ -731,13 +861,18 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
 
   const node = await queryProductOffer(itemId, atual.shop_id);
   if (!node) {
+    // Não grava comissão nova: mantém o último valor conhecido e avisa que ficou sem verificar.
+    const antigos = (Array.isArray(atual.alertas) ? atual.alertas : []).filter(
+      (a) => a && a.tipo !== "nao_encontrado"
+    );
     await supabase.from("product_backups").update({
       status_api: "produto_nao_encontrado",
-      ultima_verificacao: new Date().toISOString(),
-      alertas: [{
+      alertas: [...antigos, {
         tipo: "nao_encontrado",
         nivel: "critico",
-        mensagem: "Produto não retornou na API productOfferV2. Pode ter saído do programa.",
+        visto: false,
+        criado_em: new Date().toISOString(),
+        mensagem: `Produto não retornou na Shopee hoje. Comissão mostrada é a de ${atual.ultima_verificacao ? new Date(atual.ultima_verificacao).toLocaleDateString("pt-BR") : "antes"}.`,
       }],
     }).eq("user_id", userId).eq("item_id", String(itemId));
     return { success: true, status: "produto_nao_encontrado" };
@@ -747,6 +882,14 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
   novo = await ensureAffiliateLink(novo);
   const alertasNovos = buildAlertas(atual, novo);
   const alertas = mesclarAlertasComissao(atual.alertas, alertasNovos);
+  // Avisos de comissão que surgiram agora (ainda não estavam pendentes): usados para o Telegram.
+  const jaPendentes = (Array.isArray(atual.alertas) ? atual.alertas : []).filter(
+    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto !== true
+  );
+  const novosAvisos = alertasNovos
+    .filter((a) => TIPOS_ALERTA_COMISSAO.includes(a.tipo))
+    .filter((a) => !jaPendentes.some((p) => p.tipo === a.tipo))
+    .map((a) => ({ ...a, nome: novo.nome, itemId: String(itemId) }));
   const row = {
     ...rowFromProduto(userId, novo, {
       apelido: atual.apelido,
@@ -759,7 +902,7 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
   };
   const { error: upErr } = await supabase.from("product_backups").upsert(row, { onConflict: "user_id,item_id" });
   if (upErr) throw new Error(upErr.message);
-  return { success: true, status: "ok", produto: mapBackupRow(row), alertas };
+  return { success: true, status: "ok", produto: mapBackupRow(row), alertas, novosAvisos };
 }
 
 async function buscarSimilaresDaLoja(loja, excluirItemId = null, userId = null, shopId = null) {
@@ -1096,7 +1239,7 @@ async function atualizarBackupsEmLote(itemIds = [], userId = requireUserId()) {
   for (let i = 0; i < ids.length; i += 1) {
     try {
       const r = await atualizarBackup(ids[i], userId);
-      results.push({ itemId: ids[i], ok: true, status: r.status });
+      results.push({ itemId: ids[i], ok: true, status: r.status, novosAvisos: r.novosAvisos || [] });
     } catch (err) {
       results.push({ itemId: ids[i], ok: false, error: err.message });
     }
@@ -1436,19 +1579,29 @@ async function garimpoContextual(body = {}, userId = requireUserId()) {
   // Critérios do operador: comissão em R$ (prioridade 1), vendas mínimas e avaliação como desempate.
   const comissaoMin = Math.max(0, Number(body.comissaoMinBRL ?? 5));
   const vendasMin = Math.max(0, Number(body.vendasMin ?? 300));
-  const limite = Math.min(3, Math.max(1, Number(body.limite ?? 3)));
+  // Teto padrão 3 (uso na tela); a rodada diária pede até 10 via "teto".
+  const limite = Math.min(Number(body.teto) || 3, Math.max(1, Number(body.limite ?? 3)));
   const exclude = new Set((body.excludeItemIds || []).map(String));
+  // Excluídas com comissão registrada voltam só se a comissão subiu; null (exclusão antiga) continua fora.
+  const ocultos = body.excluidosComissao || {};
+  const voltaSeSubiu = (p) => {
+    const id = String(p.itemId);
+    if (!(id in ocultos)) return true;
+    const antes = ocultos[id];
+    return antes != null && Number(p.comissao_pct || 0) > Number(antes);
+  };
   // Busca geral (sem filtrar por loja), para achar derivadas de outras lojas.
   const pack = await queryProductOffersByKeyword(termo, { limit: 50, sortType: 2 });
   const comissaoRS = (p) => Number(p.comissao_valor || 0) || (Number(p.preco || 0) * Number(p.comissao_pct || 0)) / 100;
   const ofertas = (pack.nodes || [])
     .map(normalizeShopeeProduct)
     .filter((p) => p.itemId && !exclude.has(String(p.itemId)))
+    .filter(voltaSeSubiu)
     .filter((p) => (preco > 0 ? Number(p.precoMin || p.preco || 0) <= max : true))
     .filter((p) => comissaoRS(p) >= comissaoMin)
     .filter((p) => Number(p.vendas_shopee || 0) >= vendasMin)
     .sort((a, b) => (comissaoRS(b) - comissaoRS(a)) || (b.vendas_shopee - a.vendas_shopee) || (b.rating - a.rating))
-    .slice(0, body.usarIA ? 12 : limite);
+    .slice(0, body.usarIA ? Math.max(12, limite) : limite);
 
   // Comparação visual com IA (Haiku): nota de semelhança de peça; sem IA ou se falhar, mantém o ranking numérico.
   if (body.usarIA && ofertas.length) {
@@ -1482,6 +1635,8 @@ module.exports = {
   atualizarBackup,
   marcarAlertaVisto,
   atualizarTodosBackupsDoUsuario,
+  buscarSugestoesDiarias,
+  registrarRoboExcluido,
   atualizarBackupsEmLote,
   atualizarGrupoBackup,
   buscarSimilaresDaLoja,

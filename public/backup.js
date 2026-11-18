@@ -273,35 +273,27 @@
     return itens;
   }
 
+  // Um banner por vez, logo abaixo do bloco Backup. Ciente ou × marca como visto e mostra o próximo.
   function renderAlertasComissao(backups) {
-    const box = $("#backup-alertas-comissao");
+    const box = $("#backup-banner-comissao");
     if (!box) return;
     const itens = alertasComissaoPendentes(backups);
     if (!itens.length) {
       box.innerHTML = "";
       return;
     }
-    const linhas = itens.map(({ b, a }) => {
-      const nome = b.apelido || b.nome || "Produto";
-      const img = b.imagem
-        ? `<img class="bk-alerta-img" src="${escapeHtml(b.imagem)}" alt="" loading="lazy" />`
-        : `<div class="bk-alerta-img bk-alerta-img--ph"></div>`;
-      const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
-      const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
-      return `
-        <div class="bk-alerta-row">
-          ${img}
-          <div class="bk-alerta-info">
-            <div class="bk-alerta-nome">${escapeHtml(nome)}</div>
-            <div class="bk-alerta-val"><s>${de}</s> → <b>${para}</b> de comissão</div>
-          </div>
-          <button type="button" class="bk-alerta-ok" data-act="alerta-visto" data-id="${escapeHtml(b.itemId)}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button>
-        </div>`;
-    }).join("");
+    const { b, a } = itens[0];
+    const nome = b.apelido || b.nome || "Produto";
+    const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
+    const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
+    const id = escapeHtml(b.itemId);
+    const tipo = escapeHtml(a.tipo);
     box.innerHTML = `
-      <div class="bk-alertas-comissao">
-        <div class="bk-alertas-head"><i class="fa-solid fa-triangle-exclamation"></i> Comissão caiu <span class="bk-alertas-count">${itens.length}</span></div>
-        ${linhas}
+      <div class="bk-banner-com">
+        <span class="bk-banner-fila">1 de ${itens.length}</span>
+        <div class="bk-banner-txt">Comissão caiu: <b>${escapeHtml(nome)}</b>, de ${de} para ${para}.</div>
+        <button type="button" class="bk-banner-ok" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}">Ciente</button>
+        <button type="button" class="bk-banner-x" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}" aria-label="Fechar">×</button>
       </div>`;
   }
 
@@ -442,7 +434,7 @@
   function listItemHtml(b) {
     const periodo = formatPeriodoComissao(b.periodoFim);
     const comR = comissaoBRL(b);
-    const alertas = b.alertas || [];
+    const alertas = (b.alertas || []).filter((a) => a && a.tipo !== "robo_fila");
     const critico = alertas.some((a) => a.nivel === "critico");
     const status = critico
       ? `<span class="bk-badge is-danger">Fora do afiliado</span>`
@@ -494,7 +486,7 @@
     const filtro = state.filter;
     const preset = state.listPreset;
     const allCount = items.length;
-    const alertCount = items.filter((b) => (b.alertas || []).length > 0).length;
+    const alertCount = items.filter((b) => (b.alertas || []).some((a) => a && a.tipo !== "robo_fila")).length;
     const princCount = items.filter((b) => b.marcadoPrincipal).length;
     $$("#backup-filters [data-backup-filter]").forEach((btn) => {
       const id = btn.dataset.backupFilter;
@@ -502,7 +494,7 @@
       btn.textContent = id === "alertas" ? `Com alertas (${n})` : id === "principais" ? `Principais (${n})` : `Todos (${n})`;
       btn.classList.toggle("is-active", id === filtro && !preset);
     });
-    if (filtro === "alertas") items = items.filter((b) => (b.alertas || []).length > 0);
+    if (filtro === "alertas") items = items.filter((b) => (b.alertas || []).some((a) => a && a.tipo !== "robo_fila"));
     if (filtro === "principais") items = items.filter((b) => b.marcadoPrincipal);
     if (preset === "ok") items = items.filter((b) => b.status_api === "ok");
     if (preset === "fora") items = items.filter((b) => b.status_api === "produto_nao_encontrado");
@@ -535,7 +527,7 @@
   }
 
   function produtoStatusLabel(p) {
-    const alerts = p?.alertas || [];
+    const alerts = (p?.alertas || []).filter((a) => a && a.tipo !== "robo_fila");
     if (alerts.some((a) => a.nivel === "critico")) return { cls: "is-danger", text: "Fora da API" };
     if (alerts.length) return { cls: "is-warn", text: "Atenção" };
     return { cls: "is-ok", text: "Estável" };
@@ -618,6 +610,20 @@
     </div>`;
   }
 
+  // Linha de status do robô no cartão do grupo: fila, sem resultado ou falha.
+  function roboStatusHtml(principal) {
+    const fila = (principal?.alertas || []).find((a) => a && a.tipo === "robo_fila");
+    if (!fila) return `<div class="bk-meta bk-rstatus">Robô: ainda não buscou ofertas</div>`;
+    if (fila.erro) return `<div class="bk-meta bk-rstatus is-erro">Robô falhou: ${escapeHtml(fila.erro)}</div>`;
+    const n = (fila.ofertas || []).length;
+    const ia = fila.iaErro ? " · IA indisponível" : "";
+    if (!n) {
+      const termo = fila.termo ? ` para "${escapeHtml(fila.termo)}"` : "";
+      return `<div class="bk-meta bk-rstatus">Robô: sem resultado${termo}${ia}</div>`;
+    }
+    return `<div class="bk-meta bk-rstatus">Robô: ${n} oferta${n !== 1 ? "s" : ""} na fila${ia}</div>`;
+  }
+
   function grupoCardHtml(g) {
     const principal = g.produtos?.[g.principalItemId];
     const backups = (g.backupItemIds || []).map((id) => g.produtos?.[id]).filter(Boolean);
@@ -661,6 +667,7 @@
               Link ativo: <b>${escapeHtml(principal ? (principal.apelido || String(principal.nome || "").slice(0, 42)) : "—")}</b>
               <span class="bk-reservas-chip">${backups.length} reserva(s)</span>
             </div>
+            ${roboStatusHtml(principal)}
             <div class="bk-gfin">
               <span class="bk-metric">Lucro <b class="is-money">${fmt(g.lucro_historico || 0)}</b></span>
               <span class="bk-metric">GMV <b class="is-gmv">${fmt(g.gmv_historico || 0)}</b></span>
@@ -818,7 +825,7 @@
         <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos · ★ ${Number(p.rating || 0).toFixed(1)}</div>
         ${p.motivo_ia ? `<div class="bk-meta">${escapeHtml(p.motivo_ia)}</div>` : ""}
       </div>
-      <div class="bk-robo-acts">${cheio ? `<select class="bk-select-troca" aria-label="Substituir backup">${ordenados.map((b, i) => `<option value="${escapeHtml(b.itemId)}">Substituir Backup ${i + 1}</option>`).join("")}</select>` : ""}<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button><button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button></div>
+      <div class="bk-robo-acts">${cheio ? `<select class="bk-select-troca" aria-label="Substituir backup">${ordenados.map((b, i) => `<option value="${escapeHtml(b.itemId)}">Substituir Backup ${i + 1}</option>`).join("")}</select>` : ""}<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button><button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}" data-com="${escapeHtml(String(p.comissao_pct ?? ""))}">Excluir</button></div>
     </div>`;
   }
 
@@ -827,17 +834,26 @@
     if (!box) return;
     const principal = grupo.produtos?.[grupo.principalItemId];
     if (!principal) return;
-    const excluidos = roboExcluidos(grupo.docId);
+    // Excluídas só ficam fora enquanto a comissão não subir. Se subir, voltam ao radar.
+    const excluidosMapa = {};
+    for (const a of principal.alertas || []) {
+      if (a && a.tipo === "robo_excluido") excluidosMapa[String(a.itemId)] = a.comissao_pct;
+    }
+    for (const id of roboExcluidos(grupo.docId)) if (!(id in excluidosMapa)) excluidosMapa[id] = null;
     const ordenados = (grupo.backupItemIds || []).map((id) => grupo.produtos?.[id]).filter(Boolean)
       .sort((a, b) => comissaoBRL(b) - comissaoBRL(a));
     const cheio = ordenados.length >= 3;
-    const ja = new Set([principal.itemId, ...(grupo.backupItemIds || []), ...excluidos].map(String));
+    const ja = new Set([principal.itemId, ...(grupo.backupItemIds || [])].map(String));
     try {
       let cache = readRoboCache(grupo);
+      const filaServidor = (principal.alertas || []).find((x) => x && x.tipo === "robo_fila");
+      if (!force && filaServidor && Date.now() - filaServidor.ts < 36 * 3600 * 1000) {
+        cache = { ts: filaServidor.ts, ofertas: filaServidor.ofertas || [], iaErro: filaServidor.iaErro || "" };
+      }
       const fresco = cache && Date.now() - cache.ts < ROBO_TTL_MS;
       if (force || !fresco) {
         box.textContent = "Buscando derivadas…";
-        const exclude = [principal.itemId, ...(grupo.backupItemIds || []), ...excluidos];
+        const exclude = [principal.itemId, ...(grupo.backupItemIds || [])];
         const r = await api("/api/backup/garimpo-contextual", {
           method: "POST",
           body: JSON.stringify({
@@ -856,7 +872,16 @@
         cache = { ts: Date.now(), ofertas: r.ofertas || [], iaErro: r.iaErro || "" };
         writeRoboCache(grupo, cache);
       }
-      const visiveis = (cache.ofertas || []).filter((p) => !ja.has(String(p.itemId)));
+      const visiveis = (cache.ofertas || []).filter((p) => {
+        const id = String(p.itemId);
+        if (ja.has(id)) return false;
+        if (id in excluidosMapa) {
+          const antes = excluidosMapa[id];
+          // Sem comissão registrada (exclusão antiga): continua escondida. Com registro: volta se subiu.
+          if (antes == null || !(Number(p.comissao_pct || 0) > Number(antes))) return false;
+        }
+        return true;
+      });
       state.roboOfertas = state.roboOfertas || {};
       for (const p of visiveis) state.roboOfertas[String(p.itemId)] = p;
       const aviso = cache.iaErro
@@ -1381,7 +1406,7 @@
       });
     });
 
-    $("#backup-alertas-comissao")?.addEventListener("click", async (e) => {
+    $("#backup-banner-comissao")?.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-act='alerta-visto']");
       if (!btn) return;
       btn.disabled = true;
@@ -1682,6 +1707,10 @@
           if (g) await loadRobo(g, true);
         } else if (act === "robo-excluir") {
           roboExcluir(btn.dataset.gid, btn.dataset.item);
+          await api("/api/backup/robo/excluir", {
+            method: "POST",
+            body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: btn.dataset.item, comissaoPct: Number(btn.dataset.com || 0) }),
+          });
           const g = state.grupos.find((x) => x.docId === btn.dataset.gid);
           if (g) await loadRobo(g, true);
         } else if (act === "robo-save") {

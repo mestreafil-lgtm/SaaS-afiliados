@@ -15,7 +15,8 @@ const { syncMetaDaily, metaCredentialsPublic } = require("./meta");
 const { credentialsPublic } = require("./store");
 const { shopeeEndDate, brtSubtractDays } = require("./brtDates");
 const { notifyYesterdayCommission } = require("./pushCommission");
-const { atualizarTodosBackupsDoUsuario } = require("./backup");
+const { atualizarTodosBackupsDoUsuario, buscarSugestoesDiarias } = require("./backup");
+const { enviarTelegram, textoAvisoComissao } = require("./telegram");
 
 const LOCAL_INTERVAL_MS = Number(process.env.AUTO_SYNC_INTERVAL_MS || 2 * 60 * 60 * 1000);
 const LOCAL_BOOT_DELAY_MS = Number(process.env.AUTO_SYNC_BOOT_DELAY_MS || 20_000);
@@ -124,13 +125,26 @@ async function runAutoSync({ mode = "daily" } = {}) {
       results.push({ ok: !r.error, ...r });
       // Verificação diária dos backups (principal e reservas): preço e comissão
       // atualizados de madrugada, e quedas de comissão viram alerta no Backup.
-      if (syncMode === "daily") {
-        try {
-          const b = await atualizarTodosBackupsDoUsuario(user.id);
-          console.log(`[autoSync] ${user.email}: backups verificados ${b.ok}/${b.total}`);
-        } catch (e) {
-          console.warn(`[autoSync] ${user.email} backups:`, e.message || e);
+      // Rodadas "recent" também conferem os backups, mas só os que estão com verificação
+      // com mais de 3h, para não sobrecarregar a API da Shopee.
+      try {
+        const b = await atualizarTodosBackupsDoUsuario(
+          user.id,
+          syncMode === "daily" ? {} : { maxAgeHours: 3 },
+        );
+        if (b.total) console.log(`[autoSync] ${user.email}: backups verificados ${b.ok}/${b.total} (${syncMode})`);
+        for (const aviso of b.avisos || []) {
+          const r = await enviarTelegram(textoAvisoComissao(aviso));
+          if (!r.enviado && r.motivo !== "nao_configurado") {
+            console.warn(`[autoSync] telegram não enviou (${r.motivo})`);
+          }
         }
+        if (syncMode === "daily") {
+          const s = await buscarSugestoesDiarias(user.id);
+          if (s.sugestoes) console.log(`[autoSync] ${user.email}: ${s.sugestoes} sugestão(ões) de produto parecido`);
+        }
+      } catch (e) {
+        console.warn(`[autoSync] ${user.email} backups:`, e.message || e);
       }
       console.log(
         `[autoSync] ${user.email}: shopee nodes=${r.shopee?.nodes ?? "—"} meta=${r.meta?.gravados ?? r.meta?.error ?? "skip"}`,
