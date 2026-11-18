@@ -273,35 +273,27 @@
     return itens;
   }
 
+  // Um banner por vez, logo abaixo do bloco Backup. Ciente ou × marca como visto e mostra o próximo.
   function renderAlertasComissao(backups) {
-    const box = $("#backup-alertas-comissao");
+    const box = $("#backup-banner-comissao");
     if (!box) return;
     const itens = alertasComissaoPendentes(backups);
     if (!itens.length) {
       box.innerHTML = "";
       return;
     }
-    const linhas = itens.map(({ b, a }) => {
-      const nome = b.apelido || b.nome || "Produto";
-      const img = b.imagem
-        ? `<img class="bk-alerta-img" src="${escapeHtml(b.imagem)}" alt="" loading="lazy" />`
-        : `<div class="bk-alerta-img bk-alerta-img--ph"></div>`;
-      const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
-      const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
-      return `
-        <div class="bk-alerta-row">
-          ${img}
-          <div class="bk-alerta-info">
-            <div class="bk-alerta-nome">${escapeHtml(nome)}</div>
-            <div class="bk-alerta-val"><s>${de}</s> → <b>${para}</b> de comissão</div>
-          </div>
-          <button type="button" class="bk-alerta-ok" data-act="alerta-visto" data-id="${escapeHtml(b.itemId)}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button>
-        </div>`;
-    }).join("");
+    const { b, a } = itens[0];
+    const nome = b.apelido || b.nome || "Produto";
+    const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
+    const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
+    const id = escapeHtml(b.itemId);
+    const tipo = escapeHtml(a.tipo);
     box.innerHTML = `
-      <div class="bk-alertas-comissao">
-        <div class="bk-alertas-head"><i class="fa-solid fa-triangle-exclamation"></i> Comissão caiu <span class="bk-alertas-count">${itens.length}</span></div>
-        ${linhas}
+      <div class="bk-banner-com">
+        <span class="bk-banner-fila">1 de ${itens.length}</span>
+        <div class="bk-banner-txt">Comissão caiu: <b>${escapeHtml(nome)}</b>, de ${de} para ${para}.</div>
+        <button type="button" class="bk-banner-ok" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}">Ciente</button>
+        <button type="button" class="bk-banner-x" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}" aria-label="Fechar">×</button>
       </div>`;
   }
 
@@ -1385,7 +1377,7 @@
       });
     });
 
-    $("#backup-alertas-comissao")?.addEventListener("click", async (e) => {
+    $("#backup-banner-comissao")?.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-act='alerta-visto']");
       if (!btn) return;
       btn.disabled = true;

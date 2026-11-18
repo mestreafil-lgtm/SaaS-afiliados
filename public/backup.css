@@ -1641,3 +1641,11 @@
 
 .bk-alerta-link{font-size:12px;font-weight:600;color:#4f46e5;text-decoration:none;white-space:nowrap;}
 .bk-alerta-link:hover{text-decoration:underline;}
+
+.bk-banner-com{display:flex;align-items:center;gap:12px;background:#fffaf5;border:1px solid #fdba74;border-radius:14px;padding:12px 14px;margin:0 0 4px;}
+.bk-banner-fila{font-size:12px;color:#6B7280;white-space:nowrap;}
+.bk-banner-txt{flex:1;font-size:14px;color:#111827;min-width:0;}
+.bk-banner-txt b{color:#c2410c;font-weight:600;}
+.bk-banner-ok{font:inherit;font-size:13px;font-weight:600;border-radius:8px;padding:7px 14px;background:#7c3aed;border:1px solid #7c3aed;color:#fff;cursor:pointer;white-space:nowrap;}
+.bk-banner-ok:disabled{opacity:.6;cursor:default;}
+.bk-banner-x{background:transparent;border:0;font-size:20px;line-height:1;color:#6B7280;cursor:pointer;padding:0 4px;}
