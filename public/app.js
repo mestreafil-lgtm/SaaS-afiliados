@@ -2986,7 +2986,7 @@
     const v = validado === "sim" || validado === "nao" ? validado : "";
     const sid = escapeHtml(String(subid));
     return `<select class="op-select op-validado-select v-${v || "vazio"}" data-op="validado" data-subid="${sid}" title="Marque se este SubID está validado">
-      <option value="" ${v === "" ? "selected" : ""}>—</option>
+      <option value="" ${v === "" ? "selected" : ""}></option>
       <option value="sim" ${v === "sim" ? "selected" : ""}>Validado</option>
     </select>`;
   }
@@ -3604,7 +3604,7 @@
         { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
         { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
         { key: "status", label: "Status", shortLabel: "Status", num: false },
-        { key: "validado", label: "Backup", shortLabel: "Backup", num: false },
+        { key: "validado", label: "Backup da call", shortLabel: "Backup da call", num: false },
       ];
     }
     if (ch === "pinterest") {
@@ -3616,7 +3616,7 @@
         { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
         { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
         { key: "status", label: "Status", shortLabel: "Status", num: false },
-        { key: "validado", label: "Backup", shortLabel: "Backup", num: false },
+        { key: "validado", label: "Backup da call", shortLabel: "Backup da call", num: false },
       ];
     }
     return [
@@ -3625,7 +3625,7 @@
       { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
       { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
       { key: "status", label: "Status", shortLabel: "Status", num: false },
-      { key: "validado", label: "Backup", shortLabel: "Backup", num: false },
+      { key: "validado", label: "Backup da call", shortLabel: "Backup da call", num: false },
     ];
   }
 
