@@ -656,15 +656,45 @@ function mesclarAlertasComissao(anteriores, novos) {
     (p) => !novosComissao.some((n) => n.tipo === p.tipo)
   );
   // Fila do Robô de Garimpo é guardada na rodada diária; não some ao atualizar o produto.
-  const sugestoesPendentes = antigos.filter((a) => a && a.tipo === "robo_fila");
+  const sugestoesPendentes = antigos.filter((a) => a && (a.tipo === "robo_fila" || a.tipo === "robo_excluido"));
   const outros = (novos || []).filter(
-    (a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.tipo !== "robo_fila"
+    (a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.tipo !== "robo_fila" && a.tipo !== "robo_excluido"
   );
   return [...pendentesMantidos, ...novosComissao, ...sugestoesPendentes, ...outros];
 }
 
 // Roda o Robô de Garimpo de cada grupo (mesmos critérios da tela) uma vez por dia e guarda
 // a fila no principal. A tela mostra uma oferta por vez, como já funciona hoje.
+
+// Guarda no servidor que a oferta foi excluída no robô, para ela não voltar na fila.
+async function registrarRoboExcluido(grupoId, itemId, userId = requireUserId()) {
+  const supabase = getSupabase();
+  const g = await carregarGrupoComProdutos(grupoId, userId);
+  const principalId = String(g.principalItemId || "");
+  if (!principalId) throw new Error("Grupo sem principal");
+  const { data: principal, error } = await supabase
+    .from("product_backups")
+    .select("alertas")
+    .eq("user_id", userId)
+    .eq("item_id", principalId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const atuais = Array.isArray(principal?.alertas) ? principal.alertas : [];
+  const excluidos = atuais.filter((a) => a && a.tipo === "robo_excluido");
+  const outros = atuais.filter((a) => a && a.tipo !== "robo_excluido");
+  const novo = { tipo: "robo_excluido", itemId: String(itemId), ts: Date.now() };
+  const lista = [...excluidos.filter((a) => String(a.itemId) !== String(itemId)), novo].slice(-300);
+  // Tira também da fila guardada.
+  const fila = outros.map((a) => (a && a.tipo === "robo_fila"
+    ? { ...a, ofertas: (a.ofertas || []).filter((o) => String(o.itemId) !== String(itemId)) }
+    : a));
+  const { error: upErr } = await supabase.from("product_backups")
+    .update({ alertas: [...fila, ...lista] })
+    .eq("user_id", userId).eq("item_id", principalId);
+  if (upErr) throw new Error(upErr.message);
+  return { success: true };
+}
+
 async function buscarSugestoesDiarias(userId = requireUserId()) {
   const supabase = getSupabase();
   const { data: grupos, error: gErr } = await supabase
@@ -682,7 +712,12 @@ async function buscarSugestoesDiarias(userId = requireUserId()) {
     const principal = (membros || []).find((m) => String(m.item_id) === String(g.principal_item_id));
     if (!principal) continue;
 
-    const exclude = (membros || []).map((m) => String(m.item_id));
+    const exclude = [
+      ...(membros || []).map((m) => String(m.item_id)),
+      ...(Array.isArray(principal.alertas) ? principal.alertas : [])
+        .filter((a) => a && a.tipo === "robo_excluido")
+        .map((a) => String(a.itemId)),
+    ];
     let resultado;
     try {
       resultado = await garimpoContextual({
@@ -1562,6 +1597,7 @@ module.exports = {
   marcarAlertaVisto,
   atualizarTodosBackupsDoUsuario,
   buscarSugestoesDiarias,
+  registrarRoboExcluido,
   atualizarBackupsEmLote,
   atualizarGrupoBackup,
   buscarSimilaresDaLoja,

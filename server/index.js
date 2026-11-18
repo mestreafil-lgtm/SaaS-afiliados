@@ -47,6 +47,7 @@ const {
   atualizarBackup,
   marcarAlertaVisto,
   atualizarBackupsEmLote,
+  registrarRoboExcluido,
   atualizarGrupoBackup,
   buscarSimilaresDaLoja,
   criarGrupo,
@@ -1094,6 +1095,17 @@ async function requestHandler(req, res) {
           try {
             await adicionarBackupAoGrupo(body.grupoId, body.itemId);
             sendJson(res, 200, { success: true });
+          } catch (err) {
+            sendJson(res, 400, { success: false, error: err.message });
+          }
+          return;
+        }
+
+        if (pathname === "/api/backup/robo/excluir" && req.method === "POST") {
+          const body = await readBody(req);
+          try {
+            const r = await registrarRoboExcluido(body.grupoId, body.itemId);
+            sendJson(res, 200, r);
           } catch (err) {
             sendJson(res, 400, { success: false, error: err.message });
           }

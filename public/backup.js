@@ -819,7 +819,10 @@
     if (!box) return;
     const principal = grupo.produtos?.[grupo.principalItemId];
     if (!principal) return;
-    const excluidos = roboExcluidos(grupo.docId);
+    const excluidos = [
+      ...roboExcluidos(grupo.docId),
+      ...(principal.alertas || []).filter((a) => a && a.tipo === "robo_excluido").map((a) => String(a.itemId)),
+    ];
     const ordenados = (grupo.backupItemIds || []).map((id) => grupo.produtos?.[id]).filter(Boolean)
       .sort((a, b) => comissaoBRL(b) - comissaoBRL(a));
     const cheio = ordenados.length >= 3;
@@ -1678,6 +1681,10 @@
           if (g) await loadRobo(g, true);
         } else if (act === "robo-excluir") {
           roboExcluir(btn.dataset.gid, btn.dataset.item);
+          await api("/api/backup/robo/excluir", {
+            method: "POST",
+            body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: btn.dataset.item }),
+          });
           const g = state.grupos.find((x) => x.docId === btn.dataset.gid);
           if (g) await loadRobo(g, true);
         } else if (act === "robo-save") {
