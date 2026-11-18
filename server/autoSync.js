@@ -15,7 +15,8 @@ const { syncMetaDaily, metaCredentialsPublic } = require("./meta");
 const { credentialsPublic } = require("./store");
 const { shopeeEndDate, brtSubtractDays } = require("./brtDates");
 const { notifyYesterdayCommission } = require("./pushCommission");
-const { atualizarTodosBackupsDoUsuario } = require("./backup");
+const { atualizarTodosBackupsDoUsuario, buscarSugestoesDiarias } = require("./backup");
+const { enviarTelegram, textoAvisoComissao } = require("./telegram");
 
 const LOCAL_INTERVAL_MS = Number(process.env.AUTO_SYNC_INTERVAL_MS || 2 * 60 * 60 * 1000);
 const LOCAL_BOOT_DELAY_MS = Number(process.env.AUTO_SYNC_BOOT_DELAY_MS || 20_000);
@@ -132,6 +133,16 @@ async function runAutoSync({ mode = "daily" } = {}) {
           syncMode === "daily" ? {} : { maxAgeHours: 3 },
         );
         if (b.total) console.log(`[autoSync] ${user.email}: backups verificados ${b.ok}/${b.total} (${syncMode})`);
+        for (const aviso of b.avisos || []) {
+          const r = await enviarTelegram(textoAvisoComissao(aviso));
+          if (!r.enviado && r.motivo !== "nao_configurado") {
+            console.warn(`[autoSync] telegram não enviou (${r.motivo})`);
+          }
+        }
+        if (syncMode === "daily") {
+          const s = await buscarSugestoesDiarias(user.id);
+          if (s.sugestoes) console.log(`[autoSync] ${user.email}: ${s.sugestoes} sugestão(ões) de produto parecido`);
+        }
       } catch (e) {
         console.warn(`[autoSync] ${user.email} backups:`, e.message || e);
       }

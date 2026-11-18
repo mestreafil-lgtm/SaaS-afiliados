@@ -655,8 +655,72 @@ function mesclarAlertasComissao(anteriores, novos) {
   const pendentesMantidos = pendentesAntigos.filter(
     (p) => !novosComissao.some((n) => n.tipo === p.tipo)
   );
-  const outros = (novos || []).filter((a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo));
-  return [...pendentesMantidos, ...novosComissao, ...outros];
+  // Sugestões de produtos parecidos ainda não vistas continuam na lista até o usuário decidir.
+  const sugestoesPendentes = antigos.filter(
+    (a) => a && a.tipo === "similar_novo" && a.visto !== true
+  );
+  const outros = (novos || []).filter(
+    (a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.tipo !== "similar_novo"
+  );
+  return [...pendentesMantidos, ...novosComissao, ...sugestoesPendentes, ...outros];
+}
+
+// Busca produtos parecidos da mesma loja (uma vez por dia) e guarda como sugestão
+// para o principal. Não entra no grupo sozinho: só aparece como opção de substituir.
+async function buscarSugestoesDiarias(userId = requireUserId(), limitePorPrincipal = 5) {
+  const supabase = getSupabase();
+  const { data: grupos, error: gErr } = await supabase
+    .from("product_backup_grupos")
+    .select("id, principal_item_id")
+    .eq("user_id", userId);
+  if (gErr) throw new Error(gErr.message);
+  let total = 0;
+  for (const g of grupos || []) {
+    const { data: membros } = await supabase
+      .from("product_backups")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("grupo_id", g.id);
+    const principal = (membros || []).find((m) => String(m.item_id) === String(g.principal_item_id));
+    if (!principal || !principal.shop_id) continue;
+
+    const jaNoGrupo = new Set((membros || []).map((m) => String(m.item_id)));
+    const jaSugeridos = new Set(
+      (Array.isArray(principal.alertas) ? principal.alertas : [])
+        .filter((a) => a && a.tipo === "similar_novo")
+        .map((a) => String(a.itemId))
+    );
+    let similares = [];
+    try {
+      similares = await buscarSimilaresDaLoja(principal.loja, principal.item_id, userId, principal.shop_id);
+    } catch (err) {
+      console.warn("[backup] sugestões diárias falharam:", err.message);
+      continue;
+    }
+    const novos = similares
+      .filter((s) => s.itemId && !jaNoGrupo.has(String(s.itemId)) && !jaSugeridos.has(String(s.itemId)))
+      .slice(0, limitePorPrincipal);
+    if (!novos.length) continue;
+
+    const agora = new Date().toISOString();
+    const sugestoes = novos.map((s) => ({
+      tipo: "similar_novo",
+      nivel: "info",
+      visto: false,
+      criado_em: agora,
+      itemId: String(s.itemId),
+      nome: s.nome,
+      comissao_pct: s.comissao_pct,
+      preco: s.preco,
+      link: s.link || "",
+      mensagem: `Produto parecido encontrado: ${s.nome} (${s.comissao_pct}% de comissão).`,
+    }));
+    await supabase.from("product_backups").update({
+      alertas: [...(Array.isArray(principal.alertas) ? principal.alertas : []), ...sugestoes],
+    }).eq("user_id", userId).eq("item_id", String(principal.item_id));
+    total += sugestoes.length;
+  }
+  return { sugestoes: total };
 }
 
 // maxAgeHours: só verifica os que não foram conferidos nas últimas N horas (usado nas rodadas frequentes).
@@ -687,7 +751,8 @@ async function atualizarTodosBackupsDoUsuario(userId, { maxAgeHours = 0 } = {}) 
     ...todos.filter((id) => !principais.has(id)),
   ];
   const results = await atualizarBackupsEmLote(ids, userId);
-  return { total: ids.length, ok: results.filter((r) => r.ok).length };
+  const avisos = results.flatMap((r) => r.novosAvisos || []);
+  return { total: ids.length, ok: results.filter((r) => r.ok).length, avisos };
 }
 
 async function marcarAlertaVisto(itemId, tipo, userId = requireUserId()) {
@@ -759,6 +824,14 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
   novo = await ensureAffiliateLink(novo);
   const alertasNovos = buildAlertas(atual, novo);
   const alertas = mesclarAlertasComissao(atual.alertas, alertasNovos);
+  // Avisos de comissão que surgiram agora (ainda não estavam pendentes): usados para o Telegram.
+  const jaPendentes = (Array.isArray(atual.alertas) ? atual.alertas : []).filter(
+    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto !== true
+  );
+  const novosAvisos = alertasNovos
+    .filter((a) => TIPOS_ALERTA_COMISSAO.includes(a.tipo))
+    .filter((a) => !jaPendentes.some((p) => p.tipo === a.tipo))
+    .map((a) => ({ ...a, nome: novo.nome, itemId: String(itemId) }));
   const row = {
     ...rowFromProduto(userId, novo, {
       apelido: atual.apelido,
@@ -771,7 +844,7 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
   };
   const { error: upErr } = await supabase.from("product_backups").upsert(row, { onConflict: "user_id,item_id" });
   if (upErr) throw new Error(upErr.message);
-  return { success: true, status: "ok", produto: mapBackupRow(row), alertas };
+  return { success: true, status: "ok", produto: mapBackupRow(row), alertas, novosAvisos };
 }
 
 async function buscarSimilaresDaLoja(loja, excluirItemId = null, userId = null, shopId = null) {
@@ -1108,7 +1181,7 @@ async function atualizarBackupsEmLote(itemIds = [], userId = requireUserId()) {
   for (let i = 0; i < ids.length; i += 1) {
     try {
       const r = await atualizarBackup(ids[i], userId);
-      results.push({ itemId: ids[i], ok: true, status: r.status });
+      results.push({ itemId: ids[i], ok: true, status: r.status, novosAvisos: r.novosAvisos || [] });
     } catch (err) {
       results.push({ itemId: ids[i], ok: false, error: err.message });
     }
@@ -1494,6 +1567,7 @@ module.exports = {
   atualizarBackup,
   marcarAlertaVisto,
   atualizarTodosBackupsDoUsuario,
+  buscarSugestoesDiarias,
   atualizarBackupsEmLote,
   atualizarGrupoBackup,
   buscarSimilaresDaLoja,
