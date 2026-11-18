@@ -381,7 +381,7 @@ function buildAlertas(dadosAtuais, novo) {
       para: 0,
       mensagem: "Comissão caiu para 0%. Produto saiu do programa de afiliados.",
     });
-  } else if (comissaoAntiga > 0 && comissaoAntiga - comissaoNova >= 2) {
+  } else if (comissaoAntiga > 0 && comissaoNova > 0 && comissaoAntiga - comissaoNova > 0) {
     alertas.push({
       tipo: "comissao_caiu",
       nivel: "aviso",
@@ -659,14 +659,21 @@ function mesclarAlertasComissao(anteriores, novos) {
   return [...pendentesMantidos, ...novosComissao, ...outros];
 }
 
-async function atualizarTodosBackupsDoUsuario(userId) {
+// maxAgeHours: só verifica os que não foram conferidos nas últimas N horas (usado nas rodadas frequentes).
+async function atualizarTodosBackupsDoUsuario(userId, { maxAgeHours = 0 } = {}) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  let q = supabase
     .from("product_backups")
-    .select("item_id")
+    .select("item_id, ultima_verificacao")
     .eq("user_id", userId);
+  const { data, error } = await q;
   if (error) throw new Error(error.message);
-  const todos = (data || []).map((r) => String(r.item_id));
+  const limite = Date.now() - maxAgeHours * 3600 * 1000;
+  const pendentes = (data || []).filter(
+    (r) => !maxAgeHours || !r.ultima_verificacao || new Date(r.ultima_verificacao).getTime() < limite
+  );
+  if (!pendentes.length) return { total: 0, ok: 0 };
+  const todos = pendentes.map((r) => String(r.item_id));
   if (!todos.length) return { total: 0, ok: 0 };
   // Principais primeiro, depois as reservas (backups)
   const { data: grupos, error: gErr } = await supabase
@@ -731,13 +738,18 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
 
   const node = await queryProductOffer(itemId, atual.shop_id);
   if (!node) {
+    // Não grava comissão nova: mantém o último valor conhecido e avisa que ficou sem verificar.
+    const antigos = (Array.isArray(atual.alertas) ? atual.alertas : []).filter(
+      (a) => a && a.tipo !== "nao_encontrado"
+    );
     await supabase.from("product_backups").update({
       status_api: "produto_nao_encontrado",
-      ultima_verificacao: new Date().toISOString(),
-      alertas: [{
+      alertas: [...antigos, {
         tipo: "nao_encontrado",
         nivel: "critico",
-        mensagem: "Produto não retornou na API productOfferV2. Pode ter saído do programa.",
+        visto: false,
+        criado_em: new Date().toISOString(),
+        mensagem: `Produto não retornou na Shopee hoje. Comissão mostrada é a de ${atual.ultima_verificacao ? new Date(atual.ultima_verificacao).toLocaleDateString("pt-BR") : "antes"}.`,
       }],
     }).eq("user_id", userId).eq("item_id", String(itemId));
     return { success: true, status: "produto_nao_encontrado" };

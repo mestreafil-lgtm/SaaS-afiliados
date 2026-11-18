@@ -124,13 +124,16 @@ async function runAutoSync({ mode = "daily" } = {}) {
       results.push({ ok: !r.error, ...r });
       // Verificação diária dos backups (principal e reservas): preço e comissão
       // atualizados de madrugada, e quedas de comissão viram alerta no Backup.
-      if (syncMode === "daily") {
-        try {
-          const b = await atualizarTodosBackupsDoUsuario(user.id);
-          console.log(`[autoSync] ${user.email}: backups verificados ${b.ok}/${b.total}`);
-        } catch (e) {
-          console.warn(`[autoSync] ${user.email} backups:`, e.message || e);
-        }
+      // Rodadas "recent" também conferem os backups, mas só os que estão com verificação
+      // com mais de 3h, para não sobrecarregar a API da Shopee.
+      try {
+        const b = await atualizarTodosBackupsDoUsuario(
+          user.id,
+          syncMode === "daily" ? {} : { maxAgeHours: 3 },
+        );
+        if (b.total) console.log(`[autoSync] ${user.email}: backups verificados ${b.ok}/${b.total} (${syncMode})`);
+      } catch (e) {
+        console.warn(`[autoSync] ${user.email} backups:`, e.message || e);
       }
       console.log(
         `[autoSync] ${user.email}: shopee nodes=${r.shopee?.nodes ?? "—"} meta=${r.meta?.gravados ?? r.meta?.error ?? "skip"}`,
