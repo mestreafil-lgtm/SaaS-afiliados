@@ -273,48 +273,12 @@
     return itens;
   }
 
-  // Produtos parecidos encontrados pela rodada diária (opção de substituir no grupo).
-  function sugestoesSimilaresPendentes(backups) {
-    const itens = [];
-    for (const b of backups) {
-      if (!b.marcadoPrincipal && !(b.grupoId)) continue;
-      for (const a of b.alertas || []) {
-        if (!a || a.tipo !== "similar_novo" || a.visto === true) continue;
-        itens.push({ b, a });
-      }
-    }
-    return itens;
-  }
-
-  function renderSugestoesSimilares(backups) {
-    const itens = sugestoesSimilaresPendentes(backups);
-    if (!itens.length) return "";
-    const linhas = itens.map(({ b, a }) => {
-      const link = a.link ? `<a class="bk-alerta-link" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">Ver produto</a>` : "";
-      return `
-        <div class="bk-alerta-row">
-          <div class="bk-alerta-info">
-            <div class="bk-alerta-nome">${escapeHtml(a.nome || "Produto parecido")}</div>
-            <div class="bk-alerta-val">${escapeHtml(String(a.comissao_pct ?? ""))}% de comissão · para o grupo de ${escapeHtml(b.apelido || b.nome || "principal")}</div>
-          </div>
-          ${link}
-        </div>`;
-    }).join("");
-    return `
-      <div class="bk-alertas-comissao">
-        <div class="bk-alertas-head"><i class="fa-solid fa-magnifying-glass"></i> Produtos parecidos novos <span class="bk-alertas-count">${itens.length}</span></div>
-        ${linhas}
-        ${[...new Set(itens.map(({ b }) => b.itemId))].map((id) => `<div class="bk-alerta-row"><button type="button" class="bk-alerta-ok" data-act="alerta-visto" data-id="${escapeHtml(id)}" data-tipo="similar_novo">Ocultar sugestões deste grupo</button></div>`).join("")}
-      </div>`;
-  }
-
   function renderAlertasComissao(backups) {
     const box = $("#backup-alertas-comissao");
     if (!box) return;
     const itens = alertasComissaoPendentes(backups);
-    const sugestoesHtml = renderSugestoesSimilares(backups);
     if (!itens.length) {
-      box.innerHTML = sugestoesHtml;
+      box.innerHTML = "";
       return;
     }
     const linhas = itens.map(({ b, a }) => {
@@ -338,7 +302,7 @@
       <div class="bk-alertas-comissao">
         <div class="bk-alertas-head"><i class="fa-solid fa-triangle-exclamation"></i> Comissão caiu <span class="bk-alertas-count">${itens.length}</span></div>
         ${linhas}
-      </div>${sugestoesHtml}`;
+      </div>`;
   }
 
   async function refreshStats() {
@@ -478,7 +442,7 @@
   function listItemHtml(b) {
     const periodo = formatPeriodoComissao(b.periodoFim);
     const comR = comissaoBRL(b);
-    const alertas = (b.alertas || []).filter((a) => a && a.tipo !== "similar_novo");
+    const alertas = (b.alertas || []).filter((a) => a && a.tipo !== "robo_fila");
     const critico = alertas.some((a) => a.nivel === "critico");
     const status = critico
       ? `<span class="bk-badge is-danger">Fora do afiliado</span>`
@@ -530,7 +494,7 @@
     const filtro = state.filter;
     const preset = state.listPreset;
     const allCount = items.length;
-    const alertCount = items.filter((b) => (b.alertas || []).length > 0).length;
+    const alertCount = items.filter((b) => (b.alertas || []).some((a) => a && a.tipo !== "robo_fila")).length;
     const princCount = items.filter((b) => b.marcadoPrincipal).length;
     $$("#backup-filters [data-backup-filter]").forEach((btn) => {
       const id = btn.dataset.backupFilter;
@@ -538,7 +502,7 @@
       btn.textContent = id === "alertas" ? `Com alertas (${n})` : id === "principais" ? `Principais (${n})` : `Todos (${n})`;
       btn.classList.toggle("is-active", id === filtro && !preset);
     });
-    if (filtro === "alertas") items = items.filter((b) => (b.alertas || []).length > 0);
+    if (filtro === "alertas") items = items.filter((b) => (b.alertas || []).some((a) => a && a.tipo !== "robo_fila"));
     if (filtro === "principais") items = items.filter((b) => b.marcadoPrincipal);
     if (preset === "ok") items = items.filter((b) => b.status_api === "ok");
     if (preset === "fora") items = items.filter((b) => b.status_api === "produto_nao_encontrado");
@@ -571,7 +535,7 @@
   }
 
   function produtoStatusLabel(p) {
-    const alerts = (p?.alertas || []).filter((a) => a && a.tipo !== "similar_novo");
+    const alerts = (p?.alertas || []).filter((a) => a && a.tipo !== "robo_fila");
     if (alerts.some((a) => a.nivel === "critico")) return { cls: "is-danger", text: "Fora da API" };
     if (alerts.length) return { cls: "is-warn", text: "Atenção" };
     return { cls: "is-ok", text: "Estável" };
@@ -870,6 +834,10 @@
     const ja = new Set([principal.itemId, ...(grupo.backupItemIds || []), ...excluidos].map(String));
     try {
       let cache = readRoboCache(grupo);
+      const filaServidor = (principal.alertas || []).find((x) => x && x.tipo === "robo_fila");
+      if (!force && filaServidor && Date.now() - filaServidor.ts < 36 * 3600 * 1000) {
+        cache = { ts: filaServidor.ts, ofertas: filaServidor.ofertas || [], iaErro: filaServidor.iaErro || "" };
+      }
       const fresco = cache && Date.now() - cache.ts < ROBO_TTL_MS;
       if (force || !fresco) {
         box.textContent = "Buscando derivadas…";

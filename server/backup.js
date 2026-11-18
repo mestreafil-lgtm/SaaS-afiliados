@@ -655,19 +655,17 @@ function mesclarAlertasComissao(anteriores, novos) {
   const pendentesMantidos = pendentesAntigos.filter(
     (p) => !novosComissao.some((n) => n.tipo === p.tipo)
   );
-  // Sugestões de produtos parecidos ainda não vistas continuam na lista até o usuário decidir.
-  const sugestoesPendentes = antigos.filter(
-    (a) => a && a.tipo === "similar_novo" && a.visto !== true
-  );
+  // Fila do Robô de Garimpo é guardada na rodada diária; não some ao atualizar o produto.
+  const sugestoesPendentes = antigos.filter((a) => a && a.tipo === "robo_fila");
   const outros = (novos || []).filter(
-    (a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.tipo !== "similar_novo"
+    (a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.tipo !== "robo_fila"
   );
   return [...pendentesMantidos, ...novosComissao, ...sugestoesPendentes, ...outros];
 }
 
-// Busca produtos parecidos da mesma loja (uma vez por dia) e guarda como sugestão
-// para o principal. Não entra no grupo sozinho: só aparece como opção de substituir.
-async function buscarSugestoesDiarias(userId = requireUserId(), limitePorPrincipal = 5) {
+// Roda o Robô de Garimpo de cada grupo (mesmos critérios da tela) uma vez por dia e guarda
+// a fila no principal. A tela mostra uma oferta por vez, como já funciona hoje.
+async function buscarSugestoesDiarias(userId = requireUserId()) {
   const supabase = getSupabase();
   const { data: grupos, error: gErr } = await supabase
     .from("product_backup_grupos")
@@ -682,43 +680,39 @@ async function buscarSugestoesDiarias(userId = requireUserId(), limitePorPrincip
       .eq("user_id", userId)
       .eq("grupo_id", g.id);
     const principal = (membros || []).find((m) => String(m.item_id) === String(g.principal_item_id));
-    if (!principal || !principal.shop_id) continue;
+    if (!principal) continue;
 
-    const jaNoGrupo = new Set((membros || []).map((m) => String(m.item_id)));
-    const jaSugeridos = new Set(
-      (Array.isArray(principal.alertas) ? principal.alertas : [])
-        .filter((a) => a && a.tipo === "similar_novo")
-        .map((a) => String(a.itemId))
-    );
-    let similares = [];
+    const exclude = (membros || []).map((m) => String(m.item_id));
+    let resultado;
     try {
-      similares = await buscarSimilaresDaLoja(principal.loja, principal.item_id, userId, principal.shop_id);
+      resultado = await garimpoContextual({
+        nome: principal.nome,
+        apelido: principal.apelido || "",
+        preco: principal.preco,
+        excludeItemIds: exclude,
+        precoToleranciaAcimaPct: 5,
+        comissaoMinBRL: 5,
+        vendasMin: 0,
+        limite: 10,
+        usarIA: true,
+        principal: { imagem: principal.imagem || "" },
+      }, userId);
     } catch (err) {
-      console.warn("[backup] sugestões diárias falharam:", err.message);
+      console.warn("[backup] garimpo diário falhou:", err.message);
       continue;
     }
-    const novos = similares
-      .filter((s) => s.itemId && !jaNoGrupo.has(String(s.itemId)) && !jaSugeridos.has(String(s.itemId)))
-      .slice(0, limitePorPrincipal);
-    if (!novos.length) continue;
-
-    const agora = new Date().toISOString();
-    const sugestoes = novos.map((s) => ({
-      tipo: "similar_novo",
-      nivel: "info",
-      visto: false,
-      criado_em: agora,
-      itemId: String(s.itemId),
-      nome: s.nome,
-      comissao_pct: s.comissao_pct,
-      preco: s.preco,
-      link: s.link || "",
-      mensagem: `Produto parecido encontrado: ${s.nome} (${s.comissao_pct}% de comissão).`,
-    }));
-    await supabase.from("product_backups").update({
-      alertas: [...(Array.isArray(principal.alertas) ? principal.alertas : []), ...sugestoes],
-    }).eq("user_id", userId).eq("item_id", String(principal.item_id));
-    total += sugestoes.length;
+    const fila = {
+      tipo: "robo_fila",
+      ts: Date.now(),
+      iaErro: resultado.iaErro || "",
+      ofertas: (resultado.ofertas || []).slice(0, 10),
+    };
+    const outros = (Array.isArray(principal.alertas) ? principal.alertas : []).filter(
+      (a) => a && a.tipo !== "robo_fila" && a.tipo !== "similar_novo"
+    );
+    await supabase.from("product_backups").update({ alertas: [...outros, fila] })
+      .eq("user_id", userId).eq("item_id", String(principal.item_id));
+    total += fila.ofertas.length;
   }
   return { sugestoes: total };
 }
