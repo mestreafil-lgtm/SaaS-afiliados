@@ -3604,7 +3604,7 @@
         { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
         { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
         { key: "status", label: "Status", shortLabel: "Status", num: false },
-        { key: "validado", label: "Backup da call", shortLabel: "Backup da call", num: false },
+        { key: "validado", label: "Backup", shortLabel: "Backup", num: false },
       ];
     }
     if (ch === "pinterest") {
@@ -3616,7 +3616,7 @@
         { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
         { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
         { key: "status", label: "Status", shortLabel: "Status", num: false },
-        { key: "validado", label: "Backup da call", shortLabel: "Backup da call", num: false },
+        { key: "validado", label: "Backup", shortLabel: "Backup", num: false },
       ];
     }
     return [
@@ -3625,7 +3625,7 @@
       { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
       { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
       { key: "status", label: "Status", shortLabel: "Status", num: false },
-      { key: "validado", label: "Backup da call", shortLabel: "Backup da call", num: false },
+      { key: "validado", label: "Backup", shortLabel: "Backup", num: false },
     ];
   }
 
