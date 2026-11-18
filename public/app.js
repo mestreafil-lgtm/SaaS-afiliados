@@ -2981,6 +2981,17 @@
     </select>`;
   }
 
+  /** Validação do SubID: não marcado / Validado / Não validado. */
+  function validadoSelectHtml(subid, validado) {
+    const v = validado === "sim" || validado === "nao" ? validado : "";
+    const sid = escapeHtml(String(subid));
+    return `<select class="op-select op-validado-select v-${v || "vazio"}" data-op="validado" data-subid="${sid}" title="Marque se este SubID está validado">
+      <option value="" ${v === "" ? "selected" : ""}>—</option>
+      <option value="sim" ${v === "sim" ? "selected" : ""}>Validado</option>
+      <option value="nao" ${v === "nao" ? "selected" : ""}>Não validado</option>
+    </select>`;
+  }
+
   /** Destaca e rola até o SubID depois de mudar status (lista reordena). */
   function focusSubidAfterStatusChange(subid) {
     const sid = String(subid || "");
@@ -3315,6 +3326,7 @@
             r.status_source = saved?.status_source || partial.status_source || "manual";
           }
           if (partial.produto != null) r.produto = partial.produto;
+          if (partial.validado !== undefined) r.validado = partial.validado || null;
         }
       }
       if (isMobileLayout() && state.view === "canais") {
@@ -3593,6 +3605,7 @@
         { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
         { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
         { key: "status", label: "Status", shortLabel: "Status", num: false },
+        { key: "validado", label: "Validado", shortLabel: "Valid.", num: false },
       ];
     }
     if (ch === "pinterest") {
@@ -3604,6 +3617,7 @@
         { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
         { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
         { key: "status", label: "Status", shortLabel: "Status", num: false },
+        { key: "validado", label: "Validado", shortLabel: "Valid.", num: false },
       ];
     }
     return [
@@ -3612,14 +3626,15 @@
       { key: "abatimento", label: "% Comissão / faturamento", shortLabel: "% Com.", num: true },
       { key: "tendencia", label: "Tendência", shortLabel: "Tend.", num: true },
       { key: "status", label: "Status", shortLabel: "Status", num: false },
+      { key: "validado", label: "Validado", shortLabel: "Valid.", num: false },
     ];
   }
 
   const SUBID_COL_ESSENTIAL = {
-    meta: ["subid", "comissao", "inv_total", "lucro", "roi", "pedidos", "cliques_meta_link", "cliques_shopee", "abatimento_cliques", "tendencia", "status"],
-    pinterest: ["subid", "comissao", "inv_total", "lucro", "roi", "pedidos", "cliques_pin", "cliques_shopee", "abatimento_cliques", "tendencia", "status"],
-    organico: ["subid", "comissao", "pedidos", "cliques_shopee", "abatimento", "tendencia", "status"],
-    geral: ["subid", "comissao", "inv_total", "lucro", "roi", "pedidos", "cliques_shopee", "abatimento", "tendencia", "status"],
+    meta: ["subid", "comissao", "inv_total", "lucro", "roi", "pedidos", "cliques_meta_link", "cliques_shopee", "abatimento_cliques", "tendencia", "status", "validado"],
+    pinterest: ["subid", "comissao", "inv_total", "lucro", "roi", "pedidos", "cliques_pin", "cliques_shopee", "abatimento_cliques", "tendencia", "status", "validado"],
+    organico: ["subid", "comissao", "pedidos", "cliques_shopee", "abatimento", "tendencia", "status", "validado"],
+    geral: ["subid", "comissao", "inv_total", "lucro", "roi", "pedidos", "cliques_shopee", "abatimento", "tendencia", "status", "validado"],
   };
 
   function subidColStorageKey(ch) {
@@ -3853,6 +3868,7 @@
       case "abatimento": return `<td class="num">${fmtPct(abat)}</td>`;
       case "tendencia": return trendCellHtml(r);
       case "status": return `<td class="td-status">${statusSelectHtml(r.subid, r.status)}</td>`;
+      case "validado": return `<td class="td-validado">${validadoSelectHtml(r.subid, r.validado)}</td>`;
       default: return `<td class="num">—</td>`;
     }
   }

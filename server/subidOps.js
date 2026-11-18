@@ -23,6 +23,12 @@ function normalizeCanal(canal) {
   return null;
 }
 
+function normalizeValidado(v) {
+  if (v == null || v === "") return null;
+  const s = String(v).trim().toLowerCase();
+  return s === "sim" || s === "nao" ? s : null;
+}
+
 function normalizeStatusSource(source) {
   if (source == null || source === "") return null;
   const s = String(source).trim().toLowerCase();
@@ -122,6 +128,7 @@ async function loadSubidOps(userId = requireUserId()) {
             canal: r.canal || null,
             status: rawStatus === "pausada" ? "desativada" : rawStatus,
             produto: r.produto || null,
+            validado: normalizeValidado(r.validado),
             status_source: normalizeStatusSource(r.status_source) || null,
           };
           // Duplicata Unha001 vs unha001: não deixar indefinido sobrescrever classificado
@@ -177,6 +184,14 @@ async function upsertSubidOps(subid, partial, userId = requireUserId()) {
     nextSource = "manual";
   }
 
+  // Validado só entra na gravação quando é mexido (ou já tem valor), para que
+  // salvar status não dependa da coluna existir no banco.
+  const nextValidado = partial.validado !== undefined
+    ? normalizeValidado(partial.validado)
+    : normalizeValidado(prev.validado);
+  const validadoRow = (partial.validado !== undefined || prev.validado != null)
+    ? { validado: nextValidado }
+    : {};
   const row = {
     user_id: userId,
     subid: key,
@@ -184,10 +199,11 @@ async function upsertSubidOps(subid, partial, userId = requireUserId()) {
     status: nextStatus,
     produto: partial.produto != null ? partial.produto : prev.produto,
     status_source: nextSource,
+    ...validadoRow,
     updated_at: new Date().toISOString(),
   };
   let { error } = await supabase.from("subid_ops").upsert(row, { onConflict: "user_id,subid" });
-  if (error && /status_source|indefinido|canal/i.test(error.message || "")) {
+  if (error && /status_source|indefinido|canal|validado/i.test(error.message || "")) {
     try {
       const { ensureConfigSchema } = require("./ensureDb");
       await ensureConfigSchema();
@@ -195,8 +211,8 @@ async function upsertSubidOps(subid, partial, userId = requireUserId()) {
     ({ error } = await supabase.from("subid_ops").upsert(row, { onConflict: "user_id,subid" }));
   }
   // Coluna status_source ainda inexistente: grava sem ela
-  if (error && /status_source/i.test(error.message || "")) {
-    const { status_source: _drop, ...legacy } = row;
+  if (error && /status_source|validado/i.test(error.message || "")) {
+    const { status_source: _drop, validado: _dropV, ...legacy } = row;
     ({ error } = await supabase.from("subid_ops").upsert(legacy, { onConflict: "user_id,subid" }));
   }
   if (error) throw new Error(error.message);
@@ -235,6 +251,7 @@ function applyOpsToSubIds(subIds, opsMap) {
       status,
       produto: op.produto || r.produto || null,
       status_source: op.status_source || null,
+      validado: op.validado ?? null,
     };
   });
 }
