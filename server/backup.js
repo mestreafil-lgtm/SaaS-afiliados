@@ -742,6 +742,13 @@ async function buscarSugestoesDiarias(userId = requireUserId()) {
       }, userId);
     } catch (err) {
       console.warn("[backup] garimpo diário falhou:", err.message);
+      // Guarda o motivo da falha para a linha de status do grupo.
+      const outrosFalha = (Array.isArray(principal.alertas) ? principal.alertas : []).filter(
+        (a) => a && a.tipo !== "robo_fila" && a.tipo !== "similar_novo"
+      );
+      await supabase.from("product_backups").update({
+        alertas: [...outrosFalha, { tipo: "robo_fila", ts: Date.now(), erro: String(err.message || "erro"), termo: "", iaErro: "", ofertas: [] }],
+      }).eq("user_id", userId).eq("item_id", String(principal.item_id));
       continue;
     }
     // Excluídas só voltam se a comissão subiu em relação à que tinha na exclusão.
@@ -753,6 +760,8 @@ async function buscarSugestoesDiarias(userId = requireUserId()) {
     const fila = {
       tipo: "robo_fila",
       ts: Date.now(),
+      termo: resultado.termoUsado || "",
+      erro: "",
       iaErro: resultado.iaErro || "",
       ofertas: ofertasValidas.slice(0, 10),
     };

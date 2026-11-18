@@ -610,6 +610,20 @@
     </div>`;
   }
 
+  // Linha de status do robô no cartão do grupo: fila, sem resultado ou falha.
+  function roboStatusHtml(principal) {
+    const fila = (principal?.alertas || []).find((a) => a && a.tipo === "robo_fila");
+    if (!fila) return `<div class="bk-meta bk-rstatus">Robô: ainda não buscou ofertas</div>`;
+    if (fila.erro) return `<div class="bk-meta bk-rstatus is-erro">Robô falhou: ${escapeHtml(fila.erro)}</div>`;
+    const n = (fila.ofertas || []).length;
+    const ia = fila.iaErro ? " · IA indisponível" : "";
+    if (!n) {
+      const termo = fila.termo ? ` para "${escapeHtml(fila.termo)}"` : "";
+      return `<div class="bk-meta bk-rstatus">Robô: sem resultado${termo}${ia}</div>`;
+    }
+    return `<div class="bk-meta bk-rstatus">Robô: ${n} oferta${n !== 1 ? "s" : ""} na fila${ia}</div>`;
+  }
+
   function grupoCardHtml(g) {
     const principal = g.produtos?.[g.principalItemId];
     const backups = (g.backupItemIds || []).map((id) => g.produtos?.[id]).filter(Boolean);
@@ -653,6 +667,7 @@
               Link ativo: <b>${escapeHtml(principal ? (principal.apelido || String(principal.nome || "").slice(0, 42)) : "—")}</b>
               <span class="bk-reservas-chip">${backups.length} reserva(s)</span>
             </div>
+            ${roboStatusHtml(principal)}
             <div class="bk-gfin">
               <span class="bk-metric">Lucro <b class="is-money">${fmt(g.lucro_historico || 0)}</b></span>
               <span class="bk-metric">GMV <b class="is-gmv">${fmt(g.gmv_historico || 0)}</b></span>

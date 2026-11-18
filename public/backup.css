@@ -1649,3 +1649,6 @@
 .bk-banner-ok{font:inherit;font-size:13px;font-weight:600;border-radius:8px;padding:7px 14px;background:#7c3aed;border:1px solid #7c3aed;color:#fff;cursor:pointer;white-space:nowrap;}
 .bk-banner-ok:disabled{opacity:.6;cursor:default;}
 .bk-banner-x{background:transparent;border:0;font-size:20px;line-height:1;color:#6B7280;cursor:pointer;padding:0 4px;}
+
+.bk-rstatus { margin-top: 0.3rem; }
+.bk-rstatus.is-erro { color: #b91c1c; }
