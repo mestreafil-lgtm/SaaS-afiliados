@@ -273,12 +273,48 @@
     return itens;
   }
 
+  // Produtos parecidos encontrados pela rodada diária (opção de substituir no grupo).
+  function sugestoesSimilaresPendentes(backups) {
+    const itens = [];
+    for (const b of backups) {
+      if (!b.marcadoPrincipal && !(b.grupoId)) continue;
+      for (const a of b.alertas || []) {
+        if (!a || a.tipo !== "similar_novo" || a.visto === true) continue;
+        itens.push({ b, a });
+      }
+    }
+    return itens;
+  }
+
+  function renderSugestoesSimilares(backups) {
+    const itens = sugestoesSimilaresPendentes(backups);
+    if (!itens.length) return "";
+    const linhas = itens.map(({ b, a }) => {
+      const link = a.link ? `<a class="bk-alerta-link" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">Ver produto</a>` : "";
+      return `
+        <div class="bk-alerta-row">
+          <div class="bk-alerta-info">
+            <div class="bk-alerta-nome">${escapeHtml(a.nome || "Produto parecido")}</div>
+            <div class="bk-alerta-val">${escapeHtml(String(a.comissao_pct ?? ""))}% de comissão · para o grupo de ${escapeHtml(b.apelido || b.nome || "principal")}</div>
+          </div>
+          ${link}
+        </div>`;
+    }).join("");
+    return `
+      <div class="bk-alertas-comissao">
+        <div class="bk-alertas-head"><i class="fa-solid fa-magnifying-glass"></i> Produtos parecidos novos <span class="bk-alertas-count">${itens.length}</span></div>
+        ${linhas}
+        ${[...new Set(itens.map(({ b }) => b.itemId))].map((id) => `<div class="bk-alerta-row"><button type="button" class="bk-alerta-ok" data-act="alerta-visto" data-id="${escapeHtml(id)}" data-tipo="similar_novo">Ocultar sugestões deste grupo</button></div>`).join("")}
+      </div>`;
+  }
+
   function renderAlertasComissao(backups) {
     const box = $("#backup-alertas-comissao");
     if (!box) return;
     const itens = alertasComissaoPendentes(backups);
+    const sugestoesHtml = renderSugestoesSimilares(backups);
     if (!itens.length) {
-      box.innerHTML = "";
+      box.innerHTML = sugestoesHtml;
       return;
     }
     const linhas = itens.map(({ b, a }) => {
@@ -302,7 +338,7 @@
       <div class="bk-alertas-comissao">
         <div class="bk-alertas-head"><i class="fa-solid fa-triangle-exclamation"></i> Comissão caiu <span class="bk-alertas-count">${itens.length}</span></div>
         ${linhas}
-      </div>`;
+      </div>${sugestoesHtml}`;
   }
 
   async function refreshStats() {
@@ -442,7 +478,7 @@
   function listItemHtml(b) {
     const periodo = formatPeriodoComissao(b.periodoFim);
     const comR = comissaoBRL(b);
-    const alertas = b.alertas || [];
+    const alertas = (b.alertas || []).filter((a) => a && a.tipo !== "similar_novo");
     const critico = alertas.some((a) => a.nivel === "critico");
     const status = critico
       ? `<span class="bk-badge is-danger">Fora do afiliado</span>`
@@ -535,7 +571,7 @@
   }
 
   function produtoStatusLabel(p) {
-    const alerts = p?.alertas || [];
+    const alerts = (p?.alertas || []).filter((a) => a && a.tipo !== "similar_novo");
     if (alerts.some((a) => a.nivel === "critico")) return { cls: "is-danger", text: "Fora da API" };
     if (alerts.length) return { cls: "is-warn", text: "Atenção" };
     return { cls: "is-ok", text: "Estável" };
