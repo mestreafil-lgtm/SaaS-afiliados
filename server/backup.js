@@ -667,7 +667,7 @@ function mesclarAlertasComissao(anteriores, novos) {
 // a fila no principal. A tela mostra uma oferta por vez, como já funciona hoje.
 
 // Guarda no servidor que a oferta foi excluída no robô, para ela não voltar na fila.
-async function registrarRoboExcluido(grupoId, itemId, userId = requireUserId()) {
+async function registrarRoboExcluido(grupoId, itemId, comissaoPct = 0, userId = requireUserId()) {
   const supabase = getSupabase();
   const g = await carregarGrupoComProdutos(grupoId, userId);
   const principalId = String(g.principalItemId || "");
@@ -682,7 +682,7 @@ async function registrarRoboExcluido(grupoId, itemId, userId = requireUserId()) 
   const atuais = Array.isArray(principal?.alertas) ? principal.alertas : [];
   const excluidos = atuais.filter((a) => a && a.tipo === "robo_excluido");
   const outros = atuais.filter((a) => a && a.tipo !== "robo_excluido");
-  const novo = { tipo: "robo_excluido", itemId: String(itemId), ts: Date.now() };
+  const novo = { tipo: "robo_excluido", itemId: String(itemId), ts: Date.now(), comissao_pct: Number(comissaoPct || 0) };
   const lista = [...excluidos.filter((a) => String(a.itemId) !== String(itemId)), novo].slice(-300);
   // Tira também da fila guardada.
   const fila = outros.map((a) => (a && a.tipo === "robo_fila"
@@ -712,12 +712,14 @@ async function buscarSugestoesDiarias(userId = requireUserId()) {
     const principal = (membros || []).find((m) => String(m.item_id) === String(g.principal_item_id));
     if (!principal) continue;
 
-    const exclude = [
-      ...(membros || []).map((m) => String(m.item_id)),
-      ...(Array.isArray(principal.alertas) ? principal.alertas : [])
-        .filter((a) => a && a.tipo === "robo_excluido")
-        .map((a) => String(a.itemId)),
-    ];
+    const excluidosAntes = {};
+    for (const a of Array.isArray(principal.alertas) ? principal.alertas : []) {
+      if (a && a.tipo === "robo_excluido") {
+        // Exclusões antigas sem comissão registrada continuam bloqueadas (Infinity).
+        excluidosAntes[String(a.itemId)] = a.comissao_pct == null ? Infinity : Number(a.comissao_pct);
+      }
+    }
+    const exclude = (membros || []).map((m) => String(m.item_id));
     let resultado;
     try {
       resultado = await garimpoContextual({
@@ -736,11 +738,17 @@ async function buscarSugestoesDiarias(userId = requireUserId()) {
       console.warn("[backup] garimpo diário falhou:", err.message);
       continue;
     }
+    // Excluídas só voltam se a comissão subiu em relação à que tinha na exclusão.
+    const ofertasValidas = (resultado.ofertas || []).filter((o) => {
+      const id = String(o.itemId);
+      if (!(id in excluidosAntes)) return true;
+      return Number(o.comissao_pct || 0) > excluidosAntes[id];
+    });
     const fila = {
       tipo: "robo_fila",
       ts: Date.now(),
       iaErro: resultado.iaErro || "",
-      ofertas: (resultado.ofertas || []).slice(0, 10),
+      ofertas: ofertasValidas.slice(0, 10),
     };
     const outros = (Array.isArray(principal.alertas) ? principal.alertas : []).filter(
       (a) => a && a.tipo !== "robo_fila" && a.tipo !== "similar_novo"

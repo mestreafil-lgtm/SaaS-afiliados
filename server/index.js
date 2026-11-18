@@ -1104,7 +1104,7 @@ async function requestHandler(req, res) {
         if (pathname === "/api/backup/robo/excluir" && req.method === "POST") {
           const body = await readBody(req);
           try {
-            const r = await registrarRoboExcluido(body.grupoId, body.itemId);
+            const r = await registrarRoboExcluido(body.grupoId, body.itemId, body.comissaoPct);
             sendJson(res, 200, r);
           } catch (err) {
             sendJson(res, 400, { success: false, error: err.message });

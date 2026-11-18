@@ -810,7 +810,7 @@
         <div class="bk-meta">${fmt(p.preco)} · ${Number(p.comissao_pct || 0).toFixed(1)}% (${fmt(comR)}) · ${fmtNum(p.vendas_shopee || 0)} vendidos · ★ ${Number(p.rating || 0).toFixed(1)}</div>
         ${p.motivo_ia ? `<div class="bk-meta">${escapeHtml(p.motivo_ia)}</div>` : ""}
       </div>
-      <div class="bk-robo-acts">${cheio ? `<select class="bk-select-troca" aria-label="Substituir backup">${ordenados.map((b, i) => `<option value="${escapeHtml(b.itemId)}">Substituir Backup ${i + 1}</option>`).join("")}</select>` : ""}<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button><button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Excluir</button></div>
+      <div class="bk-robo-acts">${cheio ? `<select class="bk-select-troca" aria-label="Substituir backup">${ordenados.map((b, i) => `<option value="${escapeHtml(b.itemId)}">Substituir Backup ${i + 1}</option>`).join("")}</select>` : ""}<button type="button" class="bk-btn-add-nesta" data-act="robo-save" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}">Aceitar</button><button type="button" class="bk-btn-ghost" data-act="robo-excluir" data-gid="${escapeHtml(grupo.docId)}" data-item="${escapeHtml(p.itemId)}" data-com="${escapeHtml(String(p.comissao_pct ?? ""))}">Excluir</button></div>
     </div>`;
   }
 
@@ -819,14 +819,16 @@
     if (!box) return;
     const principal = grupo.produtos?.[grupo.principalItemId];
     if (!principal) return;
-    const excluidos = [
-      ...roboExcluidos(grupo.docId),
-      ...(principal.alertas || []).filter((a) => a && a.tipo === "robo_excluido").map((a) => String(a.itemId)),
-    ];
+    // Excluídas só ficam fora enquanto a comissão não subir. Se subir, voltam ao radar.
+    const excluidosMapa = {};
+    for (const a of principal.alertas || []) {
+      if (a && a.tipo === "robo_excluido") excluidosMapa[String(a.itemId)] = a.comissao_pct;
+    }
+    for (const id of roboExcluidos(grupo.docId)) if (!(id in excluidosMapa)) excluidosMapa[id] = null;
     const ordenados = (grupo.backupItemIds || []).map((id) => grupo.produtos?.[id]).filter(Boolean)
       .sort((a, b) => comissaoBRL(b) - comissaoBRL(a));
     const cheio = ordenados.length >= 3;
-    const ja = new Set([principal.itemId, ...(grupo.backupItemIds || []), ...excluidos].map(String));
+    const ja = new Set([principal.itemId, ...(grupo.backupItemIds || [])].map(String));
     try {
       let cache = readRoboCache(grupo);
       const filaServidor = (principal.alertas || []).find((x) => x && x.tipo === "robo_fila");
@@ -836,7 +838,7 @@
       const fresco = cache && Date.now() - cache.ts < ROBO_TTL_MS;
       if (force || !fresco) {
         box.textContent = "Buscando derivadas…";
-        const exclude = [principal.itemId, ...(grupo.backupItemIds || []), ...excluidos];
+        const exclude = [principal.itemId, ...(grupo.backupItemIds || [])];
         const r = await api("/api/backup/garimpo-contextual", {
           method: "POST",
           body: JSON.stringify({
@@ -855,7 +857,16 @@
         cache = { ts: Date.now(), ofertas: r.ofertas || [], iaErro: r.iaErro || "" };
         writeRoboCache(grupo, cache);
       }
-      const visiveis = (cache.ofertas || []).filter((p) => !ja.has(String(p.itemId)));
+      const visiveis = (cache.ofertas || []).filter((p) => {
+        const id = String(p.itemId);
+        if (ja.has(id)) return false;
+        if (id in excluidosMapa) {
+          const antes = excluidosMapa[id];
+          // Sem comissão registrada (exclusão antiga): continua escondida. Com registro: volta se subiu.
+          if (antes == null || !(Number(p.comissao_pct || 0) > Number(antes))) return false;
+        }
+        return true;
+      });
       state.roboOfertas = state.roboOfertas || {};
       for (const p of visiveis) state.roboOfertas[String(p.itemId)] = p;
       const aviso = cache.iaErro
@@ -1683,7 +1694,7 @@
           roboExcluir(btn.dataset.gid, btn.dataset.item);
           await api("/api/backup/robo/excluir", {
             method: "POST",
-            body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: btn.dataset.item }),
+            body: JSON.stringify({ grupoId: btn.dataset.gid, itemId: btn.dataset.item, comissaoPct: Number(btn.dataset.com || 0) }),
           });
           const g = state.grupos.find((x) => x.docId === btn.dataset.gid);
           if (g) await loadRobo(g, true);
