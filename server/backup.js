@@ -720,6 +720,10 @@ async function buscarSugestoesDiarias(userId = requireUserId()) {
       }
     }
     const exclude = (membros || []).map((m) => String(m.item_id));
+    const excluidosComissao = {};
+    for (const id of Object.keys(excluidosAntes)) {
+      excluidosComissao[id] = excluidosAntes[id] === Infinity ? null : excluidosAntes[id];
+    }
     let resultado;
     try {
       resultado = await garimpoContextual({
@@ -731,6 +735,8 @@ async function buscarSugestoesDiarias(userId = requireUserId()) {
         comissaoMinBRL: 5,
         vendasMin: 0,
         limite: 10,
+        teto: 30,
+        excluidosComissao,
         usarIA: true,
         principal: { imagem: principal.imagem || "" },
       }, userId);
@@ -1558,19 +1564,29 @@ async function garimpoContextual(body = {}, userId = requireUserId()) {
   // Critérios do operador: comissão em R$ (prioridade 1), vendas mínimas e avaliação como desempate.
   const comissaoMin = Math.max(0, Number(body.comissaoMinBRL ?? 5));
   const vendasMin = Math.max(0, Number(body.vendasMin ?? 300));
-  const limite = Math.min(3, Math.max(1, Number(body.limite ?? 3)));
+  // Teto padrão 3 (uso na tela); a rodada diária pede até 10 via "teto".
+  const limite = Math.min(Number(body.teto) || 3, Math.max(1, Number(body.limite ?? 3)));
   const exclude = new Set((body.excludeItemIds || []).map(String));
+  // Excluídas com comissão registrada voltam só se a comissão subiu; null (exclusão antiga) continua fora.
+  const ocultos = body.excluidosComissao || {};
+  const voltaSeSubiu = (p) => {
+    const id = String(p.itemId);
+    if (!(id in ocultos)) return true;
+    const antes = ocultos[id];
+    return antes != null && Number(p.comissao_pct || 0) > Number(antes);
+  };
   // Busca geral (sem filtrar por loja), para achar derivadas de outras lojas.
   const pack = await queryProductOffersByKeyword(termo, { limit: 50, sortType: 2 });
   const comissaoRS = (p) => Number(p.comissao_valor || 0) || (Number(p.preco || 0) * Number(p.comissao_pct || 0)) / 100;
   const ofertas = (pack.nodes || [])
     .map(normalizeShopeeProduct)
     .filter((p) => p.itemId && !exclude.has(String(p.itemId)))
+    .filter(voltaSeSubiu)
     .filter((p) => (preco > 0 ? Number(p.precoMin || p.preco || 0) <= max : true))
     .filter((p) => comissaoRS(p) >= comissaoMin)
     .filter((p) => Number(p.vendas_shopee || 0) >= vendasMin)
     .sort((a, b) => (comissaoRS(b) - comissaoRS(a)) || (b.vendas_shopee - a.vendas_shopee) || (b.rating - a.rating))
-    .slice(0, body.usarIA ? 12 : limite);
+    .slice(0, body.usarIA ? Math.max(12, limite) : limite);
 
   // Comparação visual com IA (Haiku): nota de semelhança de peça; sem IA ou se falhar, mantém o ranking numérico.
   if (body.usarIA && ofertas.length) {
