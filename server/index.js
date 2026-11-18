@@ -841,6 +841,7 @@ async function requestHandler(req, res) {
               status: body.status,
               produto: body.produto,
               status_source: body.status_source,
+              validado: body.validado,
             });
             sendJson(res, 200, { success: true, ...row });
           } catch (err) {

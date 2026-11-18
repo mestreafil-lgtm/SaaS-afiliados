@@ -25,6 +25,12 @@ alter table if exists subid_ops drop constraint if exists subid_ops_status_sourc
 alter table if exists subid_ops add constraint subid_ops_status_source_check
   check (status_source is null or status_source in ('manual', 'meta', 'pinterest'));
 
+-- Validação do SubID pelo cliente: null = não marcado, 'sim' = validado, 'nao' = não validado.
+alter table if exists subid_ops add column if not exists validado text;
+alter table if exists subid_ops drop constraint if exists subid_ops_validado_check;
+alter table if exists subid_ops add constraint subid_ops_validado_check
+  check (validado is null or validado in ('sim', 'nao'));
+
 -- Backfill: registros legados com status setado mas sem origem foram edições
 -- manuais do usuário (antes do rastreio de origem). Marca como 'manual' para
 -- que sync da API Meta/CSV Pin não sobrescreva.
