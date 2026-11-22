@@ -128,9 +128,9 @@ async function runAutoSync({ mode = "daily" } = {}) {
       // Rodadas "recent" também conferem os backups, mas só os que estão com verificação
       // com mais de 3h, para não sobrecarregar a API da Shopee.
       try {
-        const b = await atualizarTodosBackupsDoUsuario(
-          user.id,
-          syncMode === "daily" ? {} : { maxAgeHours: 3 },
+        // Precisa do mesmo contexto de usuário da sincronização: a Shopee lê as credenciais dele.
+        const b = await runWithUser({ id: user.id, email: user.email }, () =>
+          atualizarTodosBackupsDoUsuario(user.id, syncMode === "daily" ? {} : { maxAgeHours: 3 }),
         );
         if (b.total) console.log(`[autoSync] ${user.email}: backups verificados ${b.ok}/${b.total} (${syncMode})`);
         for (const aviso of b.avisos || []) {
@@ -138,7 +138,9 @@ async function runAutoSync({ mode = "daily" } = {}) {
           if (!r.enviado) console.warn(`[autoSync] push de comissão não enviou (${r.motivo || "sem inscrição"})`);
         }
         if (syncMode === "daily") {
-          const s = await buscarSugestoesDiarias(user.id);
+          const s = await runWithUser({ id: user.id, email: user.email }, () =>
+            buscarSugestoesDiarias(user.id),
+          );
           if (s.sugestoes) console.log(`[autoSync] ${user.email}: ${s.sugestoes} sugestão(ões) de produto parecido`);
         }
       } catch (e) {
