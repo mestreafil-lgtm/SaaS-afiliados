@@ -201,7 +201,9 @@ async function queryProductOffer(itemId, shopId) {
   }`;
   const data = await shopeeGraphql(query);
   const nodes = data?.productOfferV2?.nodes || [];
-  if (nodes.length) return nodes[0];
+  // Só aceita o produto certo: nunca o primeiro resultado de outro item.
+  const certo = nodes.find((n) => String(n.itemId) === String(iid));
+  if (certo) return certo;
 
   try {
     const q2 = `{
@@ -211,7 +213,11 @@ async function queryProductOffer(itemId, shopId) {
     }`;
     const data2 = await shopeeGraphql(q2);
     const nodes2 = data2?.productOfferV2?.nodes || [];
-    return nodes2.find((n) => String(n.shopId) === String(shopId)) || nodes2[0] || null;
+    return (
+      nodes2.find((n) => String(n.itemId) === String(iid) && String(n.shopId) === String(shopId)) ||
+      nodes2.find((n) => String(n.itemId) === String(iid)) ||
+      null
+    );
   } catch (_) {
     return null;
   }
@@ -839,6 +845,23 @@ async function marcarAlertaVisto(itemId, tipo, userId = requireUserId()) {
   return { success: true };
 }
 
+// Diz o papel do produto no grupo: "principal do grupo X" ou "backup N do grupo X".
+async function papelDoProduto(itemId, userId) {
+  try {
+    const { data: grupos } = await getSupabase()
+      .from("product_backup_grupos")
+      .select("id, nome, principal_item_id, backup_item_ids")
+      .eq("user_id", userId);
+    for (const g of grupos || []) {
+      if (String(g.principal_item_id) === String(itemId)) return `principal do grupo ${g.nome || ""}`.trim();
+      const ids = (Array.isArray(g.backup_item_ids) ? g.backup_item_ids : []).map(String);
+      const i = ids.indexOf(String(itemId));
+      if (i >= 0) return `backup ${i + 1} do grupo ${g.nome || ""}`.trim();
+    }
+  } catch (_) { /* sem papel: o aviso sai só com o nome */ }
+  return "";
+}
+
 async function atualizarBackup(itemId, userId = requireUserId()) {
   const supabase = getSupabase();
   const { data: atual, error } = await supabase
@@ -886,10 +909,11 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
   const jaPendentes = (Array.isArray(atual.alertas) ? atual.alertas : []).filter(
     (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto !== true
   );
+  const papel = await papelDoProduto(String(itemId), userId);
   const novosAvisos = alertasNovos
     .filter((a) => TIPOS_ALERTA_COMISSAO.includes(a.tipo))
     .filter((a) => !jaPendentes.some((p) => p.tipo === a.tipo))
-    .map((a) => ({ ...a, nome: novo.nome, itemId: String(itemId) }));
+    .map((a) => ({ ...a, nome: atual.apelido || novo.nome, papel, itemId: String(itemId) }));
   const row = {
     ...rowFromProduto(userId, novo, {
       apelido: atual.apelido,
