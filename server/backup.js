@@ -1241,6 +1241,7 @@ async function atualizarBackupsEmLote(itemIds = [], userId = requireUserId()) {
       const r = await atualizarBackup(ids[i], userId);
       results.push({ itemId: ids[i], ok: true, status: r.status, novosAvisos: r.novosAvisos || [] });
     } catch (err) {
+      console.log(`[backup] falha ao atualizar item ${ids[i]} (${err.code || "erro"}): ${err.message}`);
       results.push({ itemId: ids[i], ok: false, error: err.message });
     }
     if (i < ids.length - 1) await sleep(400);
