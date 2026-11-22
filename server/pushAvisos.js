@@ -9,12 +9,13 @@ const { sendToUser } = require("./pushNotify");
 
 function textoPushAviso(aviso) {
   const nome = String(aviso?.nome || "Produto").slice(0, 60);
+  const papel = aviso?.papel ? ` (${String(aviso.papel).slice(0, 60)})` : "";
   if (aviso?.tipo === "comissao_zero") {
-    return { title: "Comissão zerou", body: `${nome}: saiu do programa (0%).` };
+    return { title: "Comissão zerou", body: `${nome}${papel}: saiu do programa (0%).` };
   }
   const de = Number(aviso?.de ?? 0);
   const para = Number(aviso?.para ?? 0);
-  return { title: "Comissão caiu", body: `${nome}: de ${de}% para ${para}%.` };
+  return { title: "Comissão caiu", body: `${nome}${papel}: de ${de}% para ${para}%.` };
 }
 
 async function enviarPushAviso(userId, aviso) {
