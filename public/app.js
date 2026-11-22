@@ -4,6 +4,8 @@
 
   const TOKEN_KEY = "metricly_access_token";
   const USER_KEY = "metricly_user";
+  const REFRESH_KEY = "metricly_refresh_token";
+  const EXPIRES_KEY = "metricly_expires_at";
   const THEME_KEY = "afiliados_theme";
 
   /* ─── Push / Browser Notifications ─── */
@@ -287,13 +289,47 @@
   }
 
   function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
-  function setSession(accessToken, user) {
+  function setSession(accessToken, user, refreshToken, expiresAt) {
     localStorage.setItem(TOKEN_KEY, accessToken || "");
     localStorage.setItem(USER_KEY, JSON.stringify(user || {}));
+    if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
+    if (expiresAt) localStorage.setItem(EXPIRES_KEY, String(expiresAt));
   }
   function clearSession() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+    localStorage.removeItem(EXPIRES_KEY);
+  }
+
+  // Renova o access_token com o refresh_token. Chamadas simultâneas compartilham a mesma renovação.
+  let renovacaoEmAndamento = null;
+  function renovarSessao() {
+    const rt = localStorage.getItem(REFRESH_KEY);
+    if (!rt) return Promise.resolve(false);
+    if (!renovacaoEmAndamento) {
+      renovacaoEmAndamento = fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      })
+        .then(async (r) => {
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok || !j.access_token) return false;
+          localStorage.setItem(TOKEN_KEY, j.access_token);
+          if (j.refresh_token) localStorage.setItem(REFRESH_KEY, j.refresh_token);
+          if (j.expires_at) localStorage.setItem(EXPIRES_KEY, String(j.expires_at));
+          return true;
+        })
+        .catch(() => false)
+        .finally(() => { renovacaoEmAndamento = null; });
+    }
+    return renovacaoEmAndamento;
+  }
+  // Renova antes de vencer (margem de 2 minutos).
+  async function renovarSessaoSeNecessario() {
+    const exp = Number(localStorage.getItem(EXPIRES_KEY) || 0);
+    if (exp && exp * 1000 - Date.now() < 120000) await renovarSessao();
   }
   function getStoredUser() {
     try { return JSON.parse(localStorage.getItem(USER_KEY) || "{}"); } catch { return {}; }
@@ -1141,6 +1177,12 @@
       err.code = "UNAUTHORIZED_STALE";
       throw err;
     }
+    // Ainda dá para renovar: o api() tenta de novo antes de deslogar.
+    if (localStorage.getItem(REFRESH_KEY)) {
+      const err = new Error(message || "Sessão expirada");
+      err.code = "UNAUTHORIZED_RETRY";
+      throw err;
+    }
     clearSession();
     showAuth();
     const err = new Error(message || "Faça login");
@@ -1149,6 +1191,20 @@
   }
 
   async function api(path, opts = {}) {
+    await renovarSessaoSeNecessario();
+    try {
+      return await apiOnce(path, opts);
+    } catch (err) {
+      if (err?.code !== "UNAUTHORIZED_RETRY") throw err;
+      if (await renovarSessao()) return apiOnce(path, opts);
+      clearSession();
+      showAuth();
+      err.code = "UNAUTHORIZED";
+      throw err;
+    }
+  }
+
+  async function apiOnce(path, opts = {}) {
     const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
     const tokenUsed = getToken();
     if (tokenUsed) headers.Authorization = `Bearer ${tokenUsed}`;
@@ -5918,7 +5974,7 @@
           setAuthMode("login");
           return;
         }
-        setSession(r.access_token, r.user);
+        setSession(r.access_token, r.user, r.refresh_token, r.expires_at);
         status.className = "form-status ok";
         status.textContent = "OK";
         showApp(r.user);
