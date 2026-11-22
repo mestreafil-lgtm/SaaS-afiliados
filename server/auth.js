@@ -275,7 +275,20 @@ async function loginUser(email, password) {
   };
 }
 
+// Troca o refresh_token por uma sessão nova (access_token renovado).
+async function refreshUserSession(refreshToken) {
+  const anon = getSupabaseAnon();
+  const { data, error } = await anon.auth.refreshSession({ refresh_token: String(refreshToken || "") });
+  if (error || !data?.session) {
+    const err = new Error("Sessão expirada");
+    err.code = "UNAUTHORIZED";
+    throw err;
+  }
+  return data.session;
+}
+
 module.exports = {
+  refreshUserSession,
   getSupabaseAdmin,
   getSupabaseAnon,
   runWithUser,

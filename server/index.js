@@ -72,6 +72,7 @@ const {
   verifyAccessToken,
   registerUser,
   loginUser,
+  refreshUserSession,
   getUser,
 } = require("./auth");
 const {
@@ -237,6 +238,7 @@ const PUBLIC_API = new Set([
   "/api/health",
   "/api/auth/login",
   "/api/auth/register",
+  "/api/auth/refresh",
   "/api/cron/sync",
   "/api/push/banner.png",
   "/api/billing/plans",
@@ -416,6 +418,22 @@ async function requestHandler(req, res) {
         });
       } catch (err) {
         sendJson(res, 400, { success: false, error: err.message });
+      }
+      return;
+    }
+
+    if (pathname === "/api/auth/refresh" && req.method === "POST") {
+      const body = await readBody(req);
+      try {
+        const session = await refreshUserSession(body.refresh_token);
+        sendJson(res, 200, {
+          success: true,
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+          expires_at: session.expires_at,
+        });
+      } catch (err) {
+        sendJson(res, 401, { success: false, error: "Faça login para continuar", code: "UNAUTHORIZED" });
       }
       return;
     }
