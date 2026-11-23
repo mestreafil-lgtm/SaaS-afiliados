@@ -273,6 +273,25 @@
     return itens;
   }
 
+  // Clicar no nome do produto no banner: vai para a aba Grupos, abre o grupo e destaca o produto.
+  async function irParaProduto(itemId) {
+    const id = String(itemId);
+    if (state.tab !== "grupos") setTab("grupos");
+    const grupo = (state.grupos || []).find(
+      (g) => String(g.principalItemId) === id || (g.backupItemIds || []).map(String).includes(id)
+    );
+    if (grupo && state.grupoExpandido !== grupo.docId) {
+      state.grupoExpandido = grupo.docId;
+      await renderGrupos();
+    }
+    const alvo = [...document.querySelectorAll("[data-item]")].find((el) => el.dataset.item === id)
+      || (grupo && [...document.querySelectorAll("[data-item]")].find((el) => el.dataset.item === String(grupo.principalItemId)));
+    if (!alvo) return;
+    alvo.scrollIntoView({ behavior: "smooth", block: "center" });
+    alvo.classList.add("bk-flash");
+    setTimeout(() => alvo.classList.remove("bk-flash"), 2500);
+  }
+
   // Um banner por vez, logo abaixo do bloco Backup. Ciente ou × marca como visto e mostra o próximo.
   function renderAlertasComissao(backups) {
     const box = $("#backup-banner-comissao");
@@ -290,7 +309,7 @@
     box.innerHTML = `
       <div class="bk-banner-com">
         <span class="bk-banner-fila">1 de ${itens.length}</span>
-        <div class="bk-banner-txt">${rotulo}: <b>${escapeHtml(nome)}</b></div>
+        <div class="bk-banner-txt">${rotulo}: <button type="button" class="bk-banner-nome" data-act="ir-produto" data-id="${id}">${escapeHtml(nome)}</button></div>
         <button type="button" class="bk-banner-ok" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}">Ciente</button>
         <button type="button" class="bk-banner-x" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}" aria-label="Fechar">×</button>
       </div>`;
@@ -1429,6 +1448,11 @@
     });
 
     $("#backup-banner-comissao")?.addEventListener("click", async (e) => {
+      const ir = e.target.closest("[data-act='ir-produto']");
+      if (ir) {
+        await irParaProduto(ir.dataset.id);
+        return;
+      }
       const btn = e.target.closest("[data-act='alerta-visto']");
       if (!btn) return;
       btn.disabled = true;
