@@ -1653,3 +1653,7 @@
 
 .bk-rstatus { margin-top: 0.3rem; }
 .bk-rstatus.is-erro { color: #b91c1c; }
+
+.bk-banner-ir{cursor:pointer;}
+.bk-banner-ir:hover b{text-decoration:underline;}
+.bk-flash{outline:2px solid #f97316;outline-offset:3px;border-radius:12px;transition:outline-color .6s;}

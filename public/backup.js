@@ -273,6 +273,23 @@
     return itens;
   }
 
+  // Leva ao produto do banner: abre o grupo dele, rola até o card e destaca por instantes.
+  async function irParaProduto(itemId) {
+    const id = String(itemId);
+    const grupo = (state.grupos || []).find(
+      (g) => String(g.principalItemId) === id || (g.backupItemIds || []).map(String).includes(id)
+    );
+    if (grupo && state.grupoExpandido !== grupo.docId) {
+      state.grupoExpandido = grupo.docId;
+      await renderGrupos();
+    }
+    const alvo = [...document.querySelectorAll("[data-item]")].find((el) => el.dataset.item === id);
+    if (!alvo) return;
+    alvo.scrollIntoView({ behavior: "smooth", block: "center" });
+    alvo.classList.add("bk-flash");
+    setTimeout(() => alvo.classList.remove("bk-flash"), 2500);
+  }
+
   // Um banner por vez, logo abaixo do bloco Backup. Ciente ou × marca como visto e mostra o próximo.
   function renderAlertasComissao(backups) {
     const box = $("#backup-banner-comissao");
@@ -291,7 +308,7 @@
     box.innerHTML = `
       <div class="bk-banner-com">
         <span class="bk-banner-fila">1 de ${itens.length}</span>
-        <div class="bk-banner-txt">Comissão caiu: <b>${escapeHtml(nome)}</b>, de ${de} para ${para}.</div>
+        <div class="bk-banner-txt bk-banner-ir" role="button" tabindex="0" data-act="ir-produto" data-id="${id}" title="Ver produto">Comissão caiu: <b>${escapeHtml(nome)}</b>, de ${de} para ${para}.</div>
         <button type="button" class="bk-banner-ok" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}">Ciente</button>
         <button type="button" class="bk-banner-x" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}" aria-label="Fechar">×</button>
       </div>`;
@@ -543,7 +560,7 @@
   function produtoTile(p, badge, isPrincipal, grupoId, sugestao) {
     if (!p) return "";
     const comR = comissaoBRL(p);
-    return `<div class="bk-tile ${isPrincipal ? "is-main" : ""}">
+    return `<div class="bk-tile ${isPrincipal ? "is-main" : ""}" data-item="${escapeHtml(p.itemId)}">
       <div class="bk-tile-badge ${sugestao ? "is-sug" : ""}">${escapeHtml(badge)}</div>
       ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph"><i class="fa-solid fa-box"></i></div>`}
       <div class="bk-tile-body">
@@ -569,7 +586,7 @@
     const st = produtoStatusLabel(p);
     const comR = comissaoBRL(p);
     const pct = Number(p.comissao_pct || 0);
-    return `<article class="bk-reserva-row${sugestao ? " is-sug" : ""}${open ? " is-open" : ""}">
+    return `<article class="bk-reserva-row${sugestao ? " is-sug" : ""}${open ? " is-open" : ""}" data-item="${escapeHtml(p.itemId)}">
       <button type="button" class="bk-reserva-hit" data-act="toggle-reserva" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" aria-expanded="${open ? "true" : "false"}">
         <div class="bk-reserva-thumb">
           ${p.imagem
@@ -597,7 +614,7 @@
 
   function vincCompactHtml(p, grupoId, n) {
     const comR = comissaoBRL(p);
-    return `<div class="bk-vinc-item">
+    return `<div class="bk-vinc-item" data-item="${escapeHtml(p.itemId)}">
       <div class="bk-vinc-tag">Backup ${n}</div>
       ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph bk-vinc-ph"><i class="fa-solid fa-box"></i></div>`}
       <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
@@ -1408,6 +1425,11 @@
     });
 
     $("#backup-banner-comissao")?.addEventListener("click", async (e) => {
+      const ir = e.target.closest("[data-act='ir-produto']");
+      if (ir) {
+        await irParaProduto(ir.dataset.id);
+        return;
+      }
       const btn = e.target.closest("[data-act='alerta-visto']");
       if (!btn) return;
       btn.disabled = true;
