@@ -541,6 +541,35 @@
     return `${pill}<div class="bk-avisos-lista">${linhas}</div>`;
   }
 
+  // Campanhas (sub-IDs) do produto principal: digitadas e removidas aqui; o link é gerado de novo.
+  const campAberto = {};
+  function campanhasHtml(p) {
+    const id = escapeHtml(p.itemId);
+    const lista = Array.isArray(p.campanhas) ? p.campanhas : [];
+    const chips = lista.length
+      ? lista.map((c) => `<span class="bk-camp-chip">${escapeHtml(c)}<button type="button" data-act="campanha-remove" data-id="${id}" data-nome="${escapeHtml(c)}" title="Remover" aria-label="Remover">×</button></span>`).join("")
+      : `<span class="bk-camp-vazio">nenhuma</span>`;
+    const aberto = campAberto[p.itemId] ? " open" : "";
+    return `<div class="bk-camp">
+      <div class="bk-camp-top"><b>Campanhas</b>${chips}<button type="button" class="bk-camp-add" data-act="campanha-toggle" data-id="${id}">+ Adicionar</button></div>
+      <div class="bk-camp-edit${aberto}" data-edit="${id}"><input type="text" maxlength="60" placeholder="Ex.: teste 210" data-campo="${id}" /><button type="button" data-act="campanha-add" data-id="${id}">Adicionar</button></div>
+    </div>`;
+  }
+
+  function campanhasDoItem(id) {
+    for (const g of state.grupos || []) {
+      const p = g.produtos && g.produtos[id];
+      if (p) return p;
+    }
+    return null;
+  }
+
+  async function salvarCampanhasDoItem(id, lista) {
+    await api("/api/backup/campanhas", { method: "POST", body: JSON.stringify({ itemId: id, campanhas: lista }) });
+    await loadGrupos();
+    await renderGrupos();
+  }
+
   function produtoTile(p, badge, isPrincipal, grupoId, sugestao) {
     if (!p) return "";
     const comR = comissaoBRL(p);
@@ -553,6 +582,7 @@
         <div><span class="bk-tile-com">${Number(p.comissao_pct || 0)}% comissão</span>
           ${comR > 0 ? `<span class="bk-tile-brl"> +${fmt(comR)}</span>` : ""}</div>
         ${avisosCardHtml(p)}
+        ${isPrincipal ? campanhasHtml(p) : ""}
         ${p.vendas_shopee ? `<div class="bk-meta">${fmtNum(p.vendas_shopee)} vendidos</div>` : ""}
         ${starsHtml(p.rating)}
         <div class="bk-tile-acts bk-acts-icons">
@@ -1483,6 +1513,38 @@
       setTab("listagem");
     });
 
+    $("#backup-root")?.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-act^='campanha-']");
+      if (!b) return;
+      const id = b.dataset.id;
+      if (b.dataset.act === "campanha-toggle") {
+        campAberto[id] = !campAberto[id];
+        const box = document.querySelector(`.bk-camp-edit[data-edit="${CSS.escape(id)}"]`);
+        box?.classList.toggle("open", !!campAberto[id]);
+        box?.querySelector("input")?.focus();
+        return;
+      }
+      const atual = (campanhasDoItem(id)?.campanhas) || [];
+      try {
+        if (b.dataset.act === "campanha-remove") {
+          await salvarCampanhasDoItem(id, atual.filter((c) => c !== b.dataset.nome));
+        } else if (b.dataset.act === "campanha-add") {
+          const inp = document.querySelector(`[data-campo="${CSS.escape(id)}"]`);
+          const v = String(inp?.value || "").trim();
+          if (!v) return;
+          campAberto[id] = true;
+          await salvarCampanhasDoItem(id, [...atual, v]);
+        }
+      } catch (err) {
+        alert(`Não consegui salvar a campanha: ${err.message}`);
+      }
+    });
+    $("#backup-root")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target.matches("[data-campo]")) {
+        e.preventDefault();
+        e.target.closest(".bk-camp")?.querySelector("[data-act='campanha-add']")?.click();
+      }
+    });
     const syncGar = (which) => {
       const range = $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo");
       const num = $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n");

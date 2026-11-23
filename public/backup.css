@@ -1676,3 +1676,17 @@
 
 .bk-val-antigo{display:inline-block;line-height:1.5;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:0 8px;font-weight:700;white-space:nowrap;}
 .bk-val-novo{display:inline-block;line-height:1.5;color:#ee4d2d;background:#fff0eb;border:1px solid #fed7aa;border-radius:999px;padding:0 8px;font-weight:700;white-space:nowrap;}
+
+/* Campanhas (sub-IDs) do produto principal */
+.bk-camp { margin-top: 0.4rem; font-size: 0.66rem; color: #6b7280; }
+.bk-camp-top { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.bk-camp-top > b { color: #182230; font-weight: 700; margin-right: 0.1rem; }
+.bk-camp-chip { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.62rem; font-weight: 700; color: #16a34a; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 999px; padding: 0 0.2rem 0 0.4rem; }
+.bk-camp-chip button { font-size: 0.7rem; line-height: 1; color: #16a34a; background: none; border: 0; padding: 0 0.2rem; cursor: pointer; }
+.bk-camp-vazio { color: #94a3b8; }
+.bk-camp-add { font-size: 0.6rem; font-weight: 700; color: #ee4d2d; background: #fff; border: 1px solid #fed7aa; border-radius: 999px; padding: 0 0.45rem; cursor: pointer; }
+.bk-camp-edit { display: none; gap: 0.3rem; margin-top: 0.3rem; }
+.bk-camp-edit.open { display: flex; }
+.bk-camp-edit input { flex: 1; min-width: 0; font-size: 0.68rem; padding: 0.25rem 0.4rem; border: 1px solid #e5e7eb; border-radius: 0.4rem; color: #182230; background: #fff; }
+.bk-camp-edit input:focus { outline: 2px solid #ee4d2d; outline-offset: 1px; }
+.bk-camp-edit button { color: #fff; background: #ee4d2d; border: 1px solid #ee4d2d; border-radius: 0.4rem; padding: 0.25rem 0.5rem; font-size: 0.65rem; font-weight: 700; cursor: pointer; white-space: nowrap; }

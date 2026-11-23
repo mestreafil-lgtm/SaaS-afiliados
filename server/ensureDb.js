@@ -18,6 +18,7 @@ alter table if exists app_settings add column if not exists backup_vendas_min in
 alter table if exists app_settings add column if not exists backup_preco_acima_pct numeric not null default 15;
 alter table if exists app_settings add column if not exists backup_preco_abaixo_pct numeric not null default 25;
 alter table if exists app_settings add column if not exists backup_preco_alerta_min numeric not null default 0.01;
+alter table if exists product_backups add column if not exists campanhas jsonb not null default '[]'::jsonb;
 alter table if exists app_settings add column if not exists claude_api_key text not null default '';
 alter table if exists app_settings add column if not exists claude_model text not null default 'claude-sonnet-4-20250514';
 
