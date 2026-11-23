@@ -282,11 +282,14 @@
     const achar = () => [...document.querySelectorAll("[data-item]")].find((el) => el.dataset.item === id);
     let alvo = null;
     if (grupo) {
+      // Abre o grupo e destaca o principal, que é o produto de referência do grupo.
       if (state.grupoExpandido !== grupo.docId) {
         state.grupoExpandido = grupo.docId;
         await renderGrupos();
       }
-      alvo = achar();
+      alvo = [...document.querySelectorAll("[data-item]")].find(
+        (el) => el.dataset.item === String(grupo.principalItemId)
+      );
     }
     if (!alvo) {
       // Produto fora de grupo: vai para a Listagem e mostra todos os itens até achar.
