@@ -279,11 +279,26 @@
     const grupo = (state.grupos || []).find(
       (g) => String(g.principalItemId) === id || (g.backupItemIds || []).map(String).includes(id)
     );
-    if (grupo && state.grupoExpandido !== grupo.docId) {
-      state.grupoExpandido = grupo.docId;
-      await renderGrupos();
+    const achar = () => [...document.querySelectorAll("[data-item]")].find((el) => el.dataset.item === id);
+    let alvo = null;
+    if (grupo) {
+      if (state.grupoExpandido !== grupo.docId) {
+        state.grupoExpandido = grupo.docId;
+        await renderGrupos();
+      }
+      alvo = achar();
     }
-    const alvo = [...document.querySelectorAll("[data-item]")].find((el) => el.dataset.item === id);
+    if (!alvo) {
+      // Produto fora de grupo: vai para a Listagem e mostra todos os itens até achar.
+      setTab("listagem");
+      await renderListagem();
+      alvo = achar();
+      if (!alvo) {
+        state.listVisible = 100000;
+        await renderListagem();
+        alvo = achar();
+      }
+    }
     if (!alvo) return;
     alvo.scrollIntoView({ behavior: "smooth", block: "center" });
     alvo.classList.add("bk-flash");
