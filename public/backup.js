@@ -605,7 +605,7 @@
       <div class="bk-meta"><b>${Number(p.comissao_pct || 0)}%</b> · ${fmt(comR)} · ${fmtNum(p.vendas_shopee || 0)} vendidos</div>
       <div class="bk-vinc-acts">
         <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}">Tornar principal</button>
-        <button type="button" class="bk-icon-btn" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Copiar link"><i class="fa-solid fa-copy"></i></button>
+        <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Copiar link">Copiar link</button>
         <button type="button" class="bk-icon-btn danger" data-act="remove-from-group" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Remover"><i class="fa-solid fa-trash"></i></button>
       </div>
     </div>`;

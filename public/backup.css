@@ -1475,9 +1475,10 @@
 .bk-vinc-item img, .bk-vinc-ph { width: 100%; height: 84px; border-radius: 8px; object-fit: cover; display: flex; align-items: center; justify-content: center; }
 .bk-vinc-name { font-size: 13px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .bk-vinc-price { font-size: 14px; font-weight: 700; color: #E4572E; }
-.bk-vinc-acts { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.bk-vinc-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
 .bk-vinc-acts button:first-child { flex: 1; border: 0; border-radius: 8px; padding: 6px 8px; background: #E4572E; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
 .bk-vinc-acts .bk-icon-btn { padding: 4px 8px; }
+.bk-vinc-acts button[data-act="copy-tile"] { flex: 1 1 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 8px; background: #fff; color: #334155; font-size: 12px; font-weight: 600; cursor: pointer; }
 
 /* Ajuste de encaixe: colunas preenchidas, sem espaço vazio */
 .bk-split { grid-template-columns: 280px minmax(0, 1fr); align-items: stretch; gap: 14px; }
