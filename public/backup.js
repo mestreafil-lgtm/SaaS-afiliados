@@ -568,8 +568,8 @@
 
   function textoAviso(a) {
     if (a.tipo === "comissao_zero") return { rotulo: "Comissão", texto: "Zerou" };
-    if (a.tipo === "preco_subiu") return { rotulo: "Preço", texto: `Subiu de <span class="bk-val-antigo">${fmt(a.de)}</span> para <span class="bk-val-novo">${fmt(a.para)}</span>` };
-    return { rotulo: "Comissão", texto: `Caiu de <span class="bk-val-antigo">${escapeHtml(String(a.de))}%</span> para <span class="bk-val-novo">${escapeHtml(String(a.para))}%</span>` };
+    if (a.tipo === "preco_subiu") return { rotulo: "Preço", texto: `<span class="bk-val-antigo">${fmt(a.de)}</span><span class="bk-aviso-seta">→</span><span class="bk-val-novo">${fmt(a.para)}</span>` };
+    return { rotulo: "Comissão", texto: `<span class="bk-val-antigo">${escapeHtml(String(a.de))}%</span><span class="bk-aviso-seta">→</span><span class="bk-val-novo">${escapeHtml(String(a.para))}%</span>` };
   }
 
   function avisosCardHtml(p) {
@@ -581,7 +581,7 @@
     if (!aberto) return pill;
     const linhas = pend.map((a) => {
       const t = textoAviso(a);
-      return `<div class="bk-aviso-linha"><div><span class="bk-aviso-rot">${t.rotulo}</span><span class="bk-aviso-txt">${t.texto}</span></div><button type="button" data-act="alerta-visto" data-id="${id}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button></div>`;
+      return `<div class="bk-aviso-linha"><div class="bk-aviso-head"><span class="bk-aviso-rot">${t.rotulo}</span><button type="button" data-act="alerta-visto" data-id="${id}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button></div><div class="bk-aviso-txt">${t.texto}</div></div>`;
     }).join("");
     return `${pill}<div class="bk-avisos-lista">${linhas}</div>`;
   }
