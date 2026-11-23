@@ -568,8 +568,8 @@
 
   function textoAviso(a) {
     if (a.tipo === "comissao_zero") return { rotulo: "Comissão", texto: "Zerou" };
-    if (a.tipo === "preco_subiu") return { rotulo: "Preço", texto: `Subiu de ${fmt(a.de)} para ${fmt(a.para)}` };
-    return { rotulo: "Comissão", texto: `Caiu de ${escapeHtml(String(a.de))}% para ${escapeHtml(String(a.para))}%` };
+    if (a.tipo === "preco_subiu") return { rotulo: "Preço", texto: `Subiu de <span class="bk-val-antigo">${fmt(a.de)}</span> para <span class="bk-val-novo">${fmt(a.para)}</span>` };
+    return { rotulo: "Comissão", texto: `Caiu de <span class="bk-val-antigo">${escapeHtml(String(a.de))}%</span> para <span class="bk-val-novo">${escapeHtml(String(a.para))}%</span>` };
   }
 
   function avisosCardHtml(p) {
