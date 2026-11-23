@@ -9,7 +9,9 @@ const { sendToUser } = require("./pushNotify");
 
 function textoPushAviso(aviso) {
   const nome = String(aviso?.nome || "Produto").slice(0, 60);
-  const papel = aviso?.papel ? ` (${String(aviso.papel).slice(0, 60)})` : "";
+  // Só o papel curto ("principal" ou "backup 1"); o nome do grupo já aparece no produto.
+  const papelCurto = String(aviso?.papel || "").split(" do grupo")[0].slice(0, 30);
+  const papel = papelCurto ? ` (${papelCurto})` : "";
   if (aviso?.tipo === "comissao_zero") {
     return { title: "Comissão zerou", body: `${nome}${papel}: saiu do programa (0%).` };
   }
