@@ -1658,3 +1658,6 @@
 .bk-queda-com{margin-top:6px;background:#fff7ed;border:1px solid #fdba74;color:#c2410c;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:600;}
 .bk-alta-preco{margin-top:6px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:600;}
 .bk-banner-com .bk-banner-txt .bk-banner-nome{background:none;border:0;padding:0;font:inherit;font-weight:600;color:#c2410c;text-decoration:underline;cursor:pointer;}
+.bk-acts-icons{display:flex;gap:6px;margin-top:8px;}
+.bk-acts-icons button{flex:1;display:flex;align-items:center;justify-content:center;padding:6px 0;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155;cursor:pointer;}
+.bk-acts-icons button.danger,.bk-acts-icons button.del{color:#b91c1c;}
