@@ -13,6 +13,11 @@ alter table if exists app_settings add column if not exists meta_bonus_100 numer
 alter table if exists app_settings add column if not exists meta_bonus_125 numeric null default 2;
 alter table if exists app_settings add column if not exists meta_bonus_150 numeric null default 3;
 alter table if exists app_settings add column if not exists meta_bonus_no_lucro boolean not null default false;
+alter table if exists app_settings add column if not exists backup_comissao_min numeric not null default 5;
+alter table if exists app_settings add column if not exists backup_vendas_min integer not null default 100;
+alter table if exists app_settings add column if not exists backup_preco_acima_pct numeric not null default 15;
+alter table if exists app_settings add column if not exists backup_preco_abaixo_pct numeric not null default 25;
+alter table if exists app_settings add column if not exists backup_preco_alerta_min numeric not null default 0.01;
 alter table if exists app_settings add column if not exists claude_api_key text not null default '';
 alter table if exists app_settings add column if not exists claude_model text not null default 'claude-sonnet-4-20250514';
 

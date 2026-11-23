@@ -925,6 +925,11 @@ async function loadSettings(userId = requireUserId()) {
       metaBonus125: data?.meta_bonus_125 != null ? Number(data.meta_bonus_125) : 2,
       metaBonus150: data?.meta_bonus_150 != null ? Number(data.meta_bonus_150) : 3,
       metaBonusNoLucro: Boolean(data?.meta_bonus_no_lucro),
+      backupComissaoMin: data?.backup_comissao_min != null ? Number(data.backup_comissao_min) : 5,
+      backupVendasMin: data?.backup_vendas_min != null ? Number(data.backup_vendas_min) : 100,
+      backupPrecoAcimaPct: data?.backup_preco_acima_pct != null ? Number(data.backup_preco_acima_pct) : 15,
+      backupPrecoAbaixoPct: data?.backup_preco_abaixo_pct != null ? Number(data.backup_preco_abaixo_pct) : 25,
+      backupPrecoAlertaMin: data?.backup_preco_alerta_min != null ? Number(data.backup_preco_alerta_min) : 0.01,
       taxRate,
       metaTaxRate,
       teamName: data?.team_name || "Minha conta",
@@ -943,6 +948,11 @@ function settingsFromRow(userId, core, extras) {
     metaBonus125: data.meta_bonus_125 != null ? Number(data.meta_bonus_125) : 2,
     metaBonus150: data.meta_bonus_150 != null ? Number(data.meta_bonus_150) : 3,
     metaBonusNoLucro: Boolean(data.meta_bonus_no_lucro),
+    backupComissaoMin: data.backup_comissao_min != null ? Number(data.backup_comissao_min) : 5,
+    backupVendasMin: data.backup_vendas_min != null ? Number(data.backup_vendas_min) : 100,
+    backupPrecoAcimaPct: data.backup_preco_acima_pct != null ? Number(data.backup_preco_acima_pct) : 15,
+    backupPrecoAbaixoPct: data.backup_preco_abaixo_pct != null ? Number(data.backup_preco_abaixo_pct) : 25,
+    backupPrecoAlertaMin: data.backup_preco_alerta_min != null ? Number(data.backup_preco_alerta_min) : 0.01,
     taxRate: data.tax_rate != null ? Number(data.tax_rate) : 11.7,
     metaTaxRate: data.meta_tax_rate != null ? Number(data.meta_tax_rate) : 12,
     teamName: data.team_name || "Minha conta",
@@ -978,6 +988,17 @@ async function saveSettings(partial, userId = requireUserId()) {
   if (partial.metaBonus125 != null) extras.meta_bonus_125 = Number(partial.metaBonus125);
   if (partial.metaBonus150 != null) extras.meta_bonus_150 = Number(partial.metaBonus150);
   if (partial.metaBonusNoLucro != null) extras.meta_bonus_no_lucro = Boolean(partial.metaBonusNoLucro);
+  if (partial.backupComissaoMin != null) {
+    extras.backup_comissao_min = Math.max(0, Math.round(Number(partial.backupComissaoMin) * 100) / 100 || 0);
+  }
+  if (partial.backupVendasMin != null) {
+    extras.backup_vendas_min = Math.max(0, Math.round(Number(partial.backupVendasMin) || 0));
+  }
+  if (partial.backupPrecoAcimaPct != null) extras.backup_preco_acima_pct = clampPct(partial.backupPrecoAcimaPct, 15);
+  if (partial.backupPrecoAbaixoPct != null) extras.backup_preco_abaixo_pct = clampPct(partial.backupPrecoAbaixoPct, 25);
+  if (partial.backupPrecoAlertaMin != null) {
+    extras.backup_preco_alerta_min = Math.max(0.01, Math.round((Number(partial.backupPrecoAlertaMin) || 0) * 100) / 100);
+  }
 
   const supabase = getSupabase();
   const { ensureConfigSchema, upsertAppSettingsSql } = require("./ensureDb");

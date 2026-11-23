@@ -1011,14 +1011,23 @@
                     <span class="bk-range"><input type="range" id="bk-gar-abaixo" min="0" max="100" value="25" /><input type="number" id="bk-gar-abaixo-n" min="0" max="100" value="25" />%</span>
                     <small>Ex.: 25% → principal R$ 100 aceita a partir de R$ 75</small>
                   </label>
-                </div>
-                <div class="bk-garimpo-sim">
-                  <label>Preço do produto principal (R$)
-                    <input type="text" id="bk-gar-exemplo" inputmode="decimal" value="99,90" />
+                  <label>Comissão mínima (R$)
+                    <span class="bk-range"><input type="number" id="bk-gar-comissao-min" min="0" step="0.5" value="5" /></span>
+                    <small>Derivadas com comissão abaixo disso não aparecem.</small>
                   </label>
-                  <p id="bk-gar-faixa">Garimpo aceita ofertas entre — e —</p>
+                  <label>Vendas mínimas
+                    <span class="bk-range"><input type="number" id="bk-gar-vendas-min" min="0" step="10" value="100" /></span>
+                    <small>Derivadas com menos vendas que isso não aparecem.</small>
+                  </label>
+                  <label>Alerta de subida de preço a partir de (R$)
+                    <span class="bk-range"><input type="number" id="bk-gar-alerta-preco-min" min="0.01" step="0.01" value="0.01" /></span>
+                    <small>Aviso quando o preço do seu produto subir pelo menos esse valor. Queda não avisa.</small>
+                  </label>
                 </div>
-                <button type="button" class="btn ghost sm" id="btn-backup-cfg-reset">Restaurar padrão</button>
+                <div class="bk-garimpo-acoes">
+                  <button type="button" id="btn-backup-cfg-reset">Restaurar padrão</button>
+                  <button type="button" id="btn-backup-cfg-salvar">Salvar configurações</button>
+                </div>
                 <p class="form-status" id="backup-cfg-status"></p>
               </div>
             </div>

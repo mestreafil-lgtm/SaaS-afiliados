@@ -372,7 +372,8 @@ async function ensureAffiliateLink(produto) {
   return produto;
 }
 
-function buildAlertas(dadosAtuais, novo) {
+
+function buildAlertas(dadosAtuais, novo, alertaPrecoMin = 0.01) {
   const alertas = [];
   const precoAntigo = Number(dadosAtuais.preco || 0);
   const comissaoAntiga = Number(dadosAtuais.comissao_pct || 0);
@@ -416,21 +417,15 @@ function buildAlertas(dadosAtuais, novo) {
     }
   }
 
-  if (precoAntigo > 0 && precoNovo > 0) {
-    const delta = ((precoNovo - precoAntigo) / precoAntigo) * 100;
-    if (delta <= -10) {
-      alertas.push({
-        tipo: "preco_caiu",
-        nivel: "info",
-        mensagem: `Preço caiu ${Math.abs(delta).toFixed(0)}% (${precoAntigo.toFixed(2)} → ${precoNovo.toFixed(2)}).`,
-      });
-    } else if (delta >= 15) {
-      alertas.push({
-        tipo: "preco_subiu",
-        nivel: "aviso",
-        mensagem: `Preço subiu ${delta.toFixed(0)}% (${precoAntigo.toFixed(2)} → ${precoNovo.toFixed(2)}).`,
-      });
-    }
+  // Alerta de qualquer subida de preço (a partir de R$ 0,01). Queda de preço não avisa.
+  if (precoAntigo > 0 && precoNovo > 0 && precoNovo - precoAntigo >= Math.max(0.01, Number(alertaPrecoMin) || 0.01)) {
+    alertas.push({
+      tipo: "preco_subiu",
+      nivel: "aviso",
+      de: precoAntigo,
+      para: precoNovo,
+      mensagem: `Preço subiu de R$ ${precoAntigo.toFixed(2)} para R$ ${precoNovo.toFixed(2)}.`,
+    });
   }
   return alertas;
 }
@@ -635,7 +630,8 @@ async function editarBackupMeta(itemId, { apelido, marcadoPrincipal } = {}, user
   return { ok: true };
 }
 
-const TIPOS_ALERTA_COMISSAO = ["comissao_caiu", "comissao_zero"];
+// Avisos que ficam pendentes até o Ciente e podem virar push: queda de comissão e aumento de preço.
+const TIPOS_ALERTA_AVISO = ["comissao_caiu", "comissao_zero", "preco_subiu"];
 
 // Alertas de queda de comissão ficam pendentes até o usuário marcar "Ciente".
 // Um alerta já marcado como visto não volta enquanto a queda for a mesma.
@@ -643,15 +639,15 @@ function mesclarAlertasComissao(anteriores, novos) {
   const agora = new Date().toISOString();
   const antigos = Array.isArray(anteriores) ? anteriores : [];
   const pendentesAntigos = antigos.filter(
-    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto !== true
+    (a) => a && TIPOS_ALERTA_AVISO.includes(a.tipo) && a.visto !== true
   );
   const vistosAntigos = antigos.filter(
-    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto === true
+    (a) => a && TIPOS_ALERTA_AVISO.includes(a.tipo) && a.visto === true
   );
   const mesmoAlerta = (x, y) => x.tipo === y.tipo && x.de === y.de && x.para === y.para;
 
   const novosComissao = (novos || [])
-    .filter((a) => TIPOS_ALERTA_COMISSAO.includes(a.tipo))
+    .filter((a) => TIPOS_ALERTA_AVISO.includes(a.tipo))
     .filter((a) => !vistosAntigos.some((v) => mesmoAlerta(v, a)))
     .map((a) => {
       const ja = pendentesAntigos.find((p) => p.tipo === a.tipo);
@@ -664,7 +660,7 @@ function mesclarAlertasComissao(anteriores, novos) {
   // Fila do Robô de Garimpo é guardada na rodada diária; não some ao atualizar o produto.
   const sugestoesPendentes = antigos.filter((a) => a && (a.tipo === "robo_fila" || a.tipo === "robo_excluido"));
   const outros = (novos || []).filter(
-    (a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.tipo !== "robo_fila" && a.tipo !== "robo_excluido"
+    (a) => !TIPOS_ALERTA_AVISO.includes(a.tipo) && a.tipo !== "robo_fila" && a.tipo !== "robo_excluido"
   );
   return [...pendentesMantidos, ...novosComissao, ...sugestoesPendentes, ...outros];
 }
@@ -737,9 +733,6 @@ async function buscarSugestoesDiarias(userId = requireUserId()) {
         apelido: principal.apelido || "",
         preco: principal.preco,
         excludeItemIds: exclude,
-        precoToleranciaAcimaPct: 5,
-        comissaoMinBRL: 5,
-        vendasMin: 0,
         limite: 10,
         teto: 30,
         excluidosComissao,
@@ -903,15 +896,16 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
 
   let novo = normalizeShopeeProduct(node);
   novo = await ensureAffiliateLink(novo);
-  const alertasNovos = buildAlertas(atual, novo);
+  const cfgAlerta = await configGarimpo(userId);
+  const alertasNovos = buildAlertas(atual, novo, cfgAlerta.alertaPrecoMin);
   const alertas = mesclarAlertasComissao(atual.alertas, alertasNovos);
   // Avisos de comissão que surgiram agora (ainda não estavam pendentes): usados para o Telegram.
   const jaPendentes = (Array.isArray(atual.alertas) ? atual.alertas : []).filter(
-    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto !== true
+    (a) => a && TIPOS_ALERTA_AVISO.includes(a.tipo) && a.visto !== true
   );
   const papel = await papelDoProduto(String(itemId), userId);
   const novosAvisos = alertasNovos
-    .filter((a) => TIPOS_ALERTA_COMISSAO.includes(a.tipo))
+    .filter((a) => TIPOS_ALERTA_AVISO.includes(a.tipo))
     .filter((a) => !jaPendentes.some((p) => p.tipo === a.tipo))
     .map((a) => ({ ...a, nome: atual.apelido || novo.nome, papel, itemId: String(itemId) }));
   const row = {
@@ -1594,16 +1588,39 @@ function comTimeout(promise, ms, mensagem) {
   return Promise.race([promise, limite]).finally(() => clearTimeout(timer));
 }
 
+async function configGarimpo(userId) {
+  // Critérios do garimpo configurados pelo usuário (aba Backup > Configurações). Padrão: R$ 5 e 100 vendas.
+  try {
+    const { data } = await getSupabase()
+      .from("app_settings")
+      .select("backup_comissao_min,backup_vendas_min,backup_preco_acima_pct,backup_preco_abaixo_pct,backup_preco_alerta_min")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return {
+      comissaoMin: data?.backup_comissao_min != null ? Number(data.backup_comissao_min) : 5,
+      vendasMin: data?.backup_vendas_min != null ? Number(data.backup_vendas_min) : 100,
+      acimaPct: data?.backup_preco_acima_pct != null ? Number(data.backup_preco_acima_pct) : 15,
+      abaixoPct: data?.backup_preco_abaixo_pct != null ? Number(data.backup_preco_abaixo_pct) : 25,
+      alertaPrecoMin: data?.backup_preco_alerta_min != null ? Number(data.backup_preco_alerta_min) : 0.01,
+    };
+  } catch (_) {
+    return { comissaoMin: 5, vendasMin: 100, acimaPct: 15, abaixoPct: 25, alertaPrecoMin: 0.01 };
+  }
+}
+
 async function garimpoContextual(body = {}, userId = requireUserId()) {
   const termo = termoGarimpo(body.nome, body.apelido);
   if (!termo) return { ofertas: [], termoUsado: "" };
   // Derivadas: até 5% acima do preço original; abaixo, qualquer valor (quanto mais barato, melhor).
-  const acima = Math.min(100, Math.max(0, Number(body.precoToleranciaAcimaPct ?? 5)));
+  const cfg = await configGarimpo(userId);
+  const acima = Math.min(100, Math.max(0, Number(body.precoToleranciaAcimaPct ?? cfg.acimaPct)));
+  const abaixo = Math.min(100, Math.max(0, Number(body.precoToleranciaAbaixoPct ?? cfg.abaixoPct)));
   const preco = parseMoneyGarimpo(body.preco);
   const max = preco > 0 ? preco * (1 + acima / 100) : Infinity;
+  const min = preco > 0 ? preco * (1 - abaixo / 100) : 0;
   // Critérios do operador: comissão em R$ (prioridade 1), vendas mínimas e avaliação como desempate.
-  const comissaoMin = Math.max(0, Number(body.comissaoMinBRL ?? 5));
-  const vendasMin = Math.max(0, Number(body.vendasMin ?? 300));
+  const comissaoMin = Math.max(0, Number(body.comissaoMinBRL ?? cfg.comissaoMin));
+  const vendasMin = Math.max(0, Number(body.vendasMin ?? cfg.vendasMin));
   // Teto padrão 3 (uso na tela); a rodada diária pede até 10 via "teto".
   const limite = Math.min(Number(body.teto) || 3, Math.max(1, Number(body.limite ?? 3)));
   const exclude = new Set((body.excludeItemIds || []).map(String));
@@ -1622,7 +1639,7 @@ async function garimpoContextual(body = {}, userId = requireUserId()) {
     .map(normalizeShopeeProduct)
     .filter((p) => p.itemId && !exclude.has(String(p.itemId)))
     .filter(voltaSeSubiu)
-    .filter((p) => (preco > 0 ? Number(p.precoMin || p.preco || 0) <= max : true))
+    .filter((p) => (preco > 0 ? Number(p.precoMin || p.preco || 0) <= max && Number(p.precoMin || p.preco || 0) >= min : true))
     .filter((p) => comissaoRS(p) >= comissaoMin)
     .filter((p) => Number(p.vendas_shopee || 0) >= vendasMin)
     .sort((a, b) => (comissaoRS(b) - comissaoRS(a)) || (b.vendas_shopee - a.vendas_shopee) || (b.rating - a.rating))

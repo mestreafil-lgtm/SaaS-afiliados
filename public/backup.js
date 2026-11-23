@@ -194,51 +194,6 @@
     if (e && em != null) e.textContent = em;
   }
 
-  const GARIMPO_KEY = "afilia:backup_garimpo_settings";
-  const GARIMPO_DEFAULT = { precoToleranciaAcimaPct: 15, precoToleranciaAbaixoPct: 25 };
-
-  function readGarimpoSettings() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(GARIMPO_KEY) || "{}");
-      const clamp = (v, fb) => {
-        const n = Number(v);
-        return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : fb;
-      };
-      return {
-        precoToleranciaAcimaPct: clamp(parsed.precoToleranciaAcimaPct, 15),
-        precoToleranciaAbaixoPct: clamp(parsed.precoToleranciaAbaixoPct, 25),
-      };
-    } catch {
-      return { ...GARIMPO_DEFAULT };
-    }
-  }
-
-  function writeGarimpoSettings(settings) {
-    const next = readGarimpoSettings();
-    if (settings.precoToleranciaAcimaPct != null) next.precoToleranciaAcimaPct = settings.precoToleranciaAcimaPct;
-    if (settings.precoToleranciaAbaixoPct != null) next.precoToleranciaAbaixoPct = settings.precoToleranciaAbaixoPct;
-    const clamp = (v, fb) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : fb;
-    };
-    const saved = {
-      precoToleranciaAcimaPct: clamp(next.precoToleranciaAcimaPct, 15),
-      precoToleranciaAbaixoPct: clamp(next.precoToleranciaAbaixoPct, 25),
-    };
-    localStorage.setItem(GARIMPO_KEY, JSON.stringify(saved));
-    return saved;
-  }
-
-  function faixaGarimpo(preco, settings) {
-    const base = Number(String(preco || "").replace(/\./g, "").replace(",", ".")) || Number(preco) || 0;
-    if (!(base > 0)) return null;
-    const s = settings || readGarimpoSettings();
-    return {
-      min: base * (1 - s.precoToleranciaAbaixoPct / 100),
-      max: base * (1 + s.precoToleranciaAcimaPct / 100),
-    };
-  }
-
   function isSinalCritico(b) {
     const preco = Number(b.preco || 0);
     const pct = Number(b.comissao_pct || 0);
@@ -260,7 +215,7 @@
     return `há ${Math.floor(h / 24)}d`;
   }
 
-  const TIPOS_CARD_COMISSAO = ["comissao_caiu", "comissao_zero"];
+  const TIPOS_CARD_COMISSAO = ["comissao_caiu", "comissao_zero", "preco_subiu"];
 
   function alertasComissaoPendentes(backups) {
     const itens = [];
@@ -271,6 +226,25 @@
       }
     }
     return itens;
+  }
+
+  // Clicar no nome do produto no banner: vai para a aba Grupos, abre o grupo e destaca o produto.
+  async function irParaProduto(itemId) {
+    const id = String(itemId);
+    if (state.tab !== "grupos") setTab("grupos");
+    const grupo = (state.grupos || []).find(
+      (g) => String(g.principalItemId) === id || (g.backupItemIds || []).map(String).includes(id)
+    );
+    if (grupo && state.grupoExpandido !== grupo.docId) {
+      state.grupoExpandido = grupo.docId;
+      await renderGrupos();
+    }
+    const alvo = [...document.querySelectorAll("[data-item]")].find((el) => el.dataset.item === id)
+      || (grupo && [...document.querySelectorAll("[data-item]")].find((el) => el.dataset.item === String(grupo.principalItemId)));
+    if (!alvo) return;
+    alvo.scrollIntoView({ behavior: "smooth", block: "center" });
+    alvo.classList.add("bk-flash");
+    setTimeout(() => alvo.classList.remove("bk-flash"), 2500);
   }
 
   // Um banner por vez, logo abaixo do bloco Backup. Ciente ou × marca como visto e mostra o próximo.
@@ -284,14 +258,13 @@
     }
     const { b, a } = itens[0];
     const nome = b.apelido || b.nome || "Produto";
-    const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
-    const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
     const id = escapeHtml(b.itemId);
     const tipo = escapeHtml(a.tipo);
+    const rotulo = a.tipo === "preco_subiu" ? "Preço subiu" : "Comissão caiu";
     box.innerHTML = `
       <div class="bk-banner-com">
         <span class="bk-banner-fila">1 de ${itens.length}</span>
-        <div class="bk-banner-txt">Comissão caiu: <b>${escapeHtml(nome)}</b>, de ${de} para ${para}.</div>
+        <div class="bk-banner-txt">${rotulo}: <button type="button" class="bk-banner-nome" data-act="ir-produto" data-id="${id}">${escapeHtml(nome)}</button></div>
         <button type="button" class="bk-banner-ok" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}">Ciente</button>
         <button type="button" class="bk-banner-x" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}" aria-label="Fechar">×</button>
       </div>`;
@@ -540,10 +513,38 @@
     return `<div class="bk-stars" aria-label="${raw.toFixed(1)} de 5">${"★".repeat(n)}${"☆".repeat(5 - n)} <span>${raw.toFixed(1)}</span></div>`;
   }
 
+  // Avisos pendentes do produto: um selo no card; ao clicar, abre a lista com "Ciente" em cada um.
+  const TIPOS_AVISO_CARD = ["comissao_caiu", "comissao_zero", "preco_subiu"];
+  const avisosAbertos = {};
+
+  function avisosPendentes(p) {
+    return (p?.alertas || []).filter((x) => x && TIPOS_AVISO_CARD.includes(x.tipo) && x.visto !== true);
+  }
+
+  function textoAviso(a) {
+    if (a.tipo === "comissao_zero") return { rotulo: "Comissão", texto: "Zerou" };
+    if (a.tipo === "preco_subiu") return { rotulo: "Preço", texto: `<span class="bk-val-antigo">${fmt(a.de)}</span><span class="bk-aviso-seta">→</span><span class="bk-val-novo">${fmt(a.para)}</span>` };
+    return { rotulo: "Comissão", texto: `<span class="bk-val-antigo">${escapeHtml(String(a.de))}%</span><span class="bk-aviso-seta">→</span><span class="bk-val-novo">${escapeHtml(String(a.para))}%</span>` };
+  }
+
+  function avisosCardHtml(p) {
+    const pend = avisosPendentes(p);
+    if (!pend.length) return "";
+    const id = escapeHtml(p.itemId);
+    const aberto = Boolean(avisosAbertos[String(p.itemId)]);
+    const pill = `<button type="button" class="bk-avisos-pill" data-act="toggle-avisos" data-id="${id}" aria-expanded="${aberto ? "true" : "false"}">${pend.length} ${pend.length === 1 ? "aviso" : "avisos"}</button>`;
+    if (!aberto) return pill;
+    const linhas = pend.map((a) => {
+      const t = textoAviso(a);
+      return `<div class="bk-aviso-linha"><div class="bk-aviso-head"><span class="bk-aviso-rot">${t.rotulo}</span><button type="button" data-act="alerta-visto" data-id="${id}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button></div><div class="bk-aviso-txt">${t.texto}</div></div>`;
+    }).join("");
+    return `${pill}<div class="bk-avisos-lista">${linhas}</div>`;
+  }
+
   function produtoTile(p, badge, isPrincipal, grupoId, sugestao) {
     if (!p) return "";
     const comR = comissaoBRL(p);
-    return `<div class="bk-tile ${isPrincipal ? "is-main" : ""}">
+    return `<div class="bk-tile ${isPrincipal ? "is-main" : ""}" data-item="${escapeHtml(p.itemId)}">
       <div class="bk-tile-badge ${sugestao ? "is-sug" : ""}">${escapeHtml(badge)}</div>
       ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph"><i class="fa-solid fa-box"></i></div>`}
       <div class="bk-tile-body">
@@ -551,13 +552,14 @@
         <div class="bk-tile-price">${fmt(p.preco)}</div>
         <div><span class="bk-tile-com">${Number(p.comissao_pct || 0)}% comissão</span>
           ${comR > 0 ? `<span class="bk-tile-brl"> +${fmt(comR)}</span>` : ""}</div>
+        ${avisosCardHtml(p)}
         ${p.vendas_shopee ? `<div class="bk-meta">${fmtNum(p.vendas_shopee)} vendidos</div>` : ""}
         ${starsHtml(p.rating)}
-        <div class="bk-tile-acts">
-          <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}">Obter link</button>
-          ${!isPrincipal ? `<button type="button" class="del" data-act="remove-from-group" data-gid="${escapeHtml(grupoId || "")}" data-id="${escapeHtml(p.itemId)}" title="Remover"><i class="fa-solid fa-trash"></i></button>` : ""}
+        <div class="bk-tile-acts bk-acts-icons">
+          <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Obter link" aria-label="Obter link"><i class="fa-solid fa-link" aria-hidden="true"></i> Obter link</button>
+          ${isPrincipal ? `<button type="button" data-act="swap" data-gid="${escapeHtml(grupoId || "")}" title="Pausar e trocar" aria-label="Pausar e trocar"><i class="fa-solid fa-right-left" aria-hidden="true"></i> Pausar e trocar</button>` : ""}
+          ${!isPrincipal ? `<button type="button" class="del" data-act="remove-from-group" data-gid="${escapeHtml(grupoId || "")}" data-id="${escapeHtml(p.itemId)}" title="Remover" aria-label="Remover"><i class="fa-solid fa-trash" aria-hidden="true"></i> Remover</button>` : ""}
         </div>
-        ${isPrincipal ? `<button type="button" class="bk-btn-pause" data-act="swap" data-gid="${escapeHtml(grupoId || "")}">Pausar e trocar</button>` : ""}
       </div>
     </div>`;
   }
@@ -569,7 +571,7 @@
     const st = produtoStatusLabel(p);
     const comR = comissaoBRL(p);
     const pct = Number(p.comissao_pct || 0);
-    return `<article class="bk-reserva-row${sugestao ? " is-sug" : ""}${open ? " is-open" : ""}">
+    return `<article class="bk-reserva-row${sugestao ? " is-sug" : ""}${open ? " is-open" : ""}" data-item="${escapeHtml(p.itemId)}">
       <button type="button" class="bk-reserva-hit" data-act="toggle-reserva" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" aria-expanded="${open ? "true" : "false"}">
         <div class="bk-reserva-thumb">
           ${p.imagem
@@ -597,15 +599,17 @@
 
   function vincCompactHtml(p, grupoId, n) {
     const comR = comissaoBRL(p);
-    return `<div class="bk-vinc-item">
+    return `<div class="bk-vinc-item" data-item="${escapeHtml(p.itemId)}">
       <div class="bk-vinc-tag">Backup ${n}</div>
       ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph bk-vinc-ph"><i class="fa-solid fa-box"></i></div>`}
       <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
       <div class="bk-vinc-price">${fmt(p.preco)}</div>
       <div class="bk-meta"><b>${Number(p.comissao_pct || 0)}%</b> · ${fmt(comR)} · ${fmtNum(p.vendas_shopee || 0)} vendidos</div>
-      <div class="bk-vinc-acts">
-        <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}">Tornar principal</button>
-        <button type="button" class="bk-icon-btn danger" data-act="remove-from-group" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Remover"><i class="fa-solid fa-trash"></i></button>
+      ${avisosCardHtml(p)}
+      <div class="bk-vinc-acts bk-acts-icons">
+        <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Tornar principal" aria-label="Tornar principal"><i class="fa-solid fa-star" aria-hidden="true"></i> Tornar principal</button>
+        <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Copiar link" aria-label="Copiar link"><i class="fa-solid fa-copy" aria-hidden="true"></i> Copiar link</button>
+        <button type="button" class="bk-icon-btn danger" data-act="remove-from-group" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Remover" aria-label="Remover"><i class="fa-solid fa-trash" aria-hidden="true"></i> Remover</button>
       </div>
     </div>`;
   }
@@ -861,9 +865,6 @@
             apelido: principal.apelido || "",
             preco: principal.preco,
             excludeItemIds: exclude,
-            precoToleranciaAcimaPct: 5,
-            comissaoMinBRL: 5,
-            vendasMin: 0,
             limite: 10,
             usarIA: true,
             principal: { imagem: principal.imagem || "" },
@@ -890,7 +891,7 @@
       const rodape = `<div class="bk-meta">Busca ${roboTempoAtras(cache.ts)} · ${visiveis.length} na fila</div>`;
       const corpo = visiveis.length
         ? roboRowHtml(visiveis[0], grupo, ordenados, cheio)
-        : `<div class="bk-meta">Nenhuma derivada nova com os critérios: até 5% acima do preço e comissão mínima R$ 5. Use o botão de atualizar para buscar de novo.</div>`;
+        : `<div class="bk-meta">Nenhuma derivada nova com os critérios: até 5% acima do preço, comissão mínima e vendas mínimas definidas em Configurações. Use o botão de atualizar para buscar de novo.</div>`;
       box.innerHTML = aviso + corpo + rodape;
     } catch (err) {
       box.innerHTML = `<div class="bk-error">${escapeHtml(err.message)}</div>`;
@@ -1049,32 +1050,56 @@
     updateTabLabels();
   }
 
-  function renderConfig() {
-    const s = readGarimpoSettings();
-    const acima = $("#bk-gar-acima");
-    const abaixo = $("#bk-gar-abaixo");
-    const acimaN = $("#bk-gar-acima-n");
-    const abaixoN = $("#bk-gar-abaixo-n");
-    if (acima) acima.value = s.precoToleranciaAcimaPct;
-    if (abaixo) abaixo.value = s.precoToleranciaAbaixoPct;
-    if (acimaN) acimaN.value = s.precoToleranciaAcimaPct;
-    if (abaixoN) abaixoN.value = s.precoToleranciaAbaixoPct;
-    paintFaixaGarimpo();
+  async function carregarCriteriosGarimpo() {
+    // Comissão e vendas mínimas ficam salvas na conta do usuário (usadas pelo robô no servidor).
+    try {
+      const r = await api("/api/settings");
+      const s = r?.settings || r || {};
+      if ($("#bk-gar-comissao-min")) $("#bk-gar-comissao-min").value = String(s.backupComissaoMin ?? 5);
+      if ($("#bk-gar-vendas-min")) $("#bk-gar-vendas-min").value = String(s.backupVendasMin ?? 100);
+      if ($("#bk-gar-alerta-preco-min")) $("#bk-gar-alerta-preco-min").value = String(s.backupPrecoAlertaMin ?? 0.01);
+      setFaixa("acima", s.backupPrecoAcimaPct ?? 15);
+      setFaixa("abaixo", s.backupPrecoAbaixoPct ?? 25);
+    } catch (_) { /* mantém os valores padrão do HTML */ }
   }
 
-  function paintFaixaGarimpo() {
-    const raw = $("#bk-gar-exemplo")?.value || "99.90";
-    const n = Number(String(raw).replace(/\./g, "").replace(",", ".")) || Number(raw) || 0;
-    const faixa = faixaGarimpo(n, {
-      precoToleranciaAcimaPct: Number($("#bk-gar-acima")?.value || 15),
-      precoToleranciaAbaixoPct: Number($("#bk-gar-abaixo")?.value || 25),
-    });
-    const el = $("#bk-gar-faixa");
-    if (!el) return;
-    el.innerHTML = faixa
-      ? `Garimpo aceita ofertas entre <b>${fmt(faixa.min)}</b> e <b>${fmt(faixa.max)}</b>`
-      : "Informe um preço válido para ver a faixa.";
+  function setFaixa(which, valor) {
+    const v = Math.min(100, Math.max(0, Math.round(Number(valor) || 0)));
+    const range = $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo");
+    const num = $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n");
+    if (range) range.value = v;
+    if (num) num.value = v;
   }
+
+  async function salvarCriteriosGarimpo() {
+    const comissao = Math.max(0, parseFloat($("#bk-gar-comissao-min")?.value || "5") || 0);
+    const vendas = Math.max(0, Math.round(Number($("#bk-gar-vendas-min")?.value || 100)));
+    const acima = Math.min(100, Math.max(0, Math.round(Number($("#bk-gar-acima-n")?.value || 15))));
+    const abaixo = Math.min(100, Math.max(0, Math.round(Number($("#bk-gar-abaixo-n")?.value || 25))));
+    const alertaPreco = Math.max(0.01, parseFloat($("#bk-gar-alerta-preco-min")?.value || "0.01") || 0.01);
+    const st = $("#backup-cfg-status");
+    try {
+      await api("/api/settings", {
+        method: "POST",
+        body: JSON.stringify({
+          backupComissaoMin: comissao,
+          backupVendasMin: vendas,
+          backupPrecoAcimaPct: acima,
+          backupPrecoAbaixoPct: abaixo,
+          backupPrecoAlertaMin: alertaPreco,
+        }),
+      });
+      state.roboCache = {};
+      if (st) { st.className = "form-status ok"; st.textContent = "Critérios do garimpo salvos na sua conta."; }
+    } catch (err) {
+      if (st) { st.className = "form-status err"; st.textContent = `Não consegui salvar: ${err.message}`; }
+    }
+  }
+
+  function renderConfig() {
+    carregarCriteriosGarimpo();
+  }
+
 
   function openModalCriarGrupo() {
     const livres = state.backups.filter((b) => !b.grupoId);
@@ -1407,6 +1432,11 @@
     });
 
     $("#backup-banner-comissao")?.addEventListener("click", async (e) => {
+      const ir = e.target.closest("[data-act='ir-produto']");
+      if (ir) {
+        await irParaProduto(ir.dataset.id);
+        return;
+      }
       const btn = e.target.closest("[data-act='alerta-visto']");
       if (!btn) return;
       btn.disabled = true;
@@ -1416,6 +1446,8 @@
           body: JSON.stringify({ itemId: btn.dataset.id, tipo: btn.dataset.tipo }),
         });
         await loadBackups();
+        await loadGrupos();
+        await renderGrupos();
         await refreshStats();
       } catch (err) {
         btn.disabled = false;
@@ -1455,28 +1487,32 @@
       const range = $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo");
       const num = $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n");
       const val = Number((document.activeElement === num ? num : range)?.value || 0);
-      if (range) range.value = val;
-      if (num) num.value = val;
-      writeGarimpoSettings({
-        precoToleranciaAcimaPct: Number($("#bk-gar-acima")?.value || 15),
-        precoToleranciaAbaixoPct: Number($("#bk-gar-abaixo")?.value || 25),
-      });
+      setFaixa(which, val);
       state.roboCache = {};
-      paintFaixaGarimpo();
-      const st = $("#backup-cfg-status");
-      if (st) { st.className = "form-status ok"; st.textContent = "Faixa do garimpo salva neste navegador."; }
     };
     ["acima", "abaixo"].forEach((which) => {
       $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo")?.addEventListener("input", () => syncGar(which));
       $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n")?.addEventListener("input", () => syncGar(which));
+      $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo")?.addEventListener("change", salvarCriteriosGarimpo);
+      $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n")?.addEventListener("change", salvarCriteriosGarimpo);
     });
-    $("#bk-gar-exemplo")?.addEventListener("input", paintFaixaGarimpo);
-    $("#btn-backup-cfg-reset")?.addEventListener("click", () => {
-      localStorage.removeItem(GARIMPO_KEY);
-      state.roboCache = {};
-      renderConfig();
+    $("#bk-gar-comissao-min")?.addEventListener("change", salvarCriteriosGarimpo);
+    $("#bk-gar-vendas-min")?.addEventListener("change", salvarCriteriosGarimpo);
+    $("#bk-gar-alerta-preco-min")?.addEventListener("change", salvarCriteriosGarimpo);
+    $("#btn-backup-cfg-salvar")?.addEventListener("click", async () => {
+      await salvarCriteriosGarimpo();
       const st = $("#backup-cfg-status");
-      if (st) { st.className = "form-status ok"; st.textContent = "Configurações do garimpo restauradas."; }
+      if (st && st.className.includes("ok")) st.textContent = "Configurações salvas na sua conta.";
+    });
+    $("#btn-backup-cfg-reset")?.addEventListener("click", async () => {
+      setFaixa("acima", 15);
+      setFaixa("abaixo", 25);
+      if ($("#bk-gar-comissao-min")) $("#bk-gar-comissao-min").value = "5";
+      if ($("#bk-gar-vendas-min")) $("#bk-gar-vendas-min").value = "100";
+      if ($("#bk-gar-alerta-preco-min")) $("#bk-gar-alerta-preco-min").value = "0.01";
+      await salvarCriteriosGarimpo();
+      const st = $("#backup-cfg-status");
+      if (st && st.className.includes("ok")) st.textContent = "Configurações do garimpo restauradas.";
     });
 
     $("#backup-search")?.addEventListener("input", () => {
@@ -1596,6 +1632,31 @@
         await refreshStats();
       } catch (err) {
         alert(err.message || String(err));
+      }
+    });
+
+    $("#backup-root")?.addEventListener("click", async (e) => {
+      const pill = e.target.closest("[data-act='toggle-avisos']");
+      if (pill) {
+        const k = String(pill.dataset.id);
+        avisosAbertos[k] = !avisosAbertos[k];
+        await renderGrupos();
+        if (state.tab === "listagem") await renderListagem();
+        return;
+      }
+      const ciente = e.target.closest("[data-act='alerta-visto']");
+      if (ciente) {
+        ciente.disabled = true;
+        try {
+          await api("/api/backup/alertas/visto", { method: "POST", body: JSON.stringify({ itemId: ciente.dataset.id, tipo: ciente.dataset.tipo }) });
+          await loadBackups();
+          await loadGrupos();
+          await renderGrupos();
+          await refreshStats();
+        } catch (err) {
+          ciente.disabled = false;
+          alert(err.message || String(err));
+        }
       }
     });
 
