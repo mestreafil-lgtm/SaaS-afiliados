@@ -372,6 +372,8 @@ async function ensureAffiliateLink(produto) {
   return produto;
 }
 
+const PRECO_SUBIU_MIN_BRL = 5;
+
 function buildAlertas(dadosAtuais, novo) {
   const alertas = [];
   const precoAntigo = Number(dadosAtuais.preco || 0);
@@ -416,21 +418,15 @@ function buildAlertas(dadosAtuais, novo) {
     }
   }
 
-  if (precoAntigo > 0 && precoNovo > 0) {
-    const delta = ((precoNovo - precoAntigo) / precoAntigo) * 100;
-    if (delta <= -10) {
-      alertas.push({
-        tipo: "preco_caiu",
-        nivel: "info",
-        mensagem: `Preço caiu ${Math.abs(delta).toFixed(0)}% (${precoAntigo.toFixed(2)} → ${precoNovo.toFixed(2)}).`,
-      });
-    } else if (delta >= 15) {
-      alertas.push({
-        tipo: "preco_subiu",
-        nivel: "aviso",
-        mensagem: `Preço subiu ${delta.toFixed(0)}% (${precoAntigo.toFixed(2)} → ${precoNovo.toFixed(2)}).`,
-      });
-    }
+  // Alerta só de subida de preço, a partir de R$ 5. Queda de preço não avisa.
+  if (precoAntigo > 0 && precoNovo > 0 && precoNovo - precoAntigo >= PRECO_SUBIU_MIN_BRL) {
+    alertas.push({
+      tipo: "preco_subiu",
+      nivel: "aviso",
+      de: precoAntigo,
+      para: precoNovo,
+      mensagem: `Preço subiu de R$ ${precoAntigo.toFixed(2)} para R$ ${precoNovo.toFixed(2)}.`,
+    });
   }
   return alertas;
 }
