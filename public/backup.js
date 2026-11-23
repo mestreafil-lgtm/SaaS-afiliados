@@ -592,9 +592,9 @@
         ${p.vendas_shopee ? `<div class="bk-meta">${fmtNum(p.vendas_shopee)} vendidos</div>` : ""}
         ${starsHtml(p.rating)}
         <div class="bk-tile-acts bk-acts-icons">
-          <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Obter link" aria-label="Obter link"><i class="fa-solid fa-link" aria-hidden="true"></i></button>
-          ${isPrincipal ? `<button type="button" data-act="swap" data-gid="${escapeHtml(grupoId || "")}" title="Pausar e trocar" aria-label="Pausar e trocar"><i class="fa-solid fa-right-left" aria-hidden="true"></i></button>` : ""}
-          ${!isPrincipal ? `<button type="button" class="del" data-act="remove-from-group" data-gid="${escapeHtml(grupoId || "")}" data-id="${escapeHtml(p.itemId)}" title="Remover" aria-label="Remover"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>` : ""}
+          <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Obter link" aria-label="Obter link"><i class="fa-solid fa-link" aria-hidden="true"></i> Obter link</button>
+          ${isPrincipal ? `<button type="button" data-act="swap" data-gid="${escapeHtml(grupoId || "")}" title="Pausar e trocar" aria-label="Pausar e trocar"><i class="fa-solid fa-right-left" aria-hidden="true"></i> Pausar e trocar</button>` : ""}
+          ${!isPrincipal ? `<button type="button" class="del" data-act="remove-from-group" data-gid="${escapeHtml(grupoId || "")}" data-id="${escapeHtml(p.itemId)}" title="Remover" aria-label="Remover"><i class="fa-solid fa-trash" aria-hidden="true"></i> Remover</button>` : ""}
         </div>
       </div>
     </div>`;
@@ -642,9 +642,9 @@
       <div class="bk-vinc-price">${fmt(p.preco)} ${altaPrecoHtml(p)}</div>
       <div class="bk-meta"><b>${Number(p.comissao_pct || 0)}%</b> · ${fmt(comR)} · ${fmtNum(p.vendas_shopee || 0)} vendidos ${quedaComissaoHtml(p)}</div>
       <div class="bk-vinc-acts bk-acts-icons">
-        <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Tornar principal" aria-label="Tornar principal"><i class="fa-solid fa-star" aria-hidden="true"></i></button>
-        <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Copiar link" aria-label="Copiar link"><i class="fa-solid fa-copy" aria-hidden="true"></i></button>
-        <button type="button" class="bk-icon-btn danger" data-act="remove-from-group" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Remover" aria-label="Remover"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+        <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Tornar principal" aria-label="Tornar principal"><i class="fa-solid fa-star" aria-hidden="true"></i> Tornar principal</button>
+        <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Copiar link" aria-label="Copiar link"><i class="fa-solid fa-copy" aria-hidden="true"></i> Copiar link</button>
+        <button type="button" class="bk-icon-btn danger" data-act="remove-from-group" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Remover" aria-label="Remover"><i class="fa-solid fa-trash" aria-hidden="true"></i> Remover</button>
       </div>
     </div>`;
   }
