@@ -362,7 +362,7 @@ async function ensureAffiliateLink(produto) {
       : "");
   if (!origin) return produto;
   try {
-    const link = await generateAffiliateShortLink(origin);
+    const link = await generateAffiliateShortLink(origin, produto.campanhas || []);
     if (link?.shortLink || link?.longLink) {
       produto.linkAfiliado = String(link.shortLink || link.longLink);
     }
@@ -463,6 +463,7 @@ function mapBackupRow(r) {
     loja: r.loja || "",
     linkProduto: r.link_produto || "",
     linkAfiliado: r.link_afiliado || "",
+    campanhas: Array.isArray(r.campanhas) ? r.campanhas : [],
     periodoInicio: r.periodo_inicio,
     periodoFim: r.periodo_fim,
     marcadoPrincipal: Boolean(r.marcado_principal),
@@ -1146,6 +1147,55 @@ async function removerBackupDoGrupo(grupoId, itemId, userId = requireUserId()) {
   return { ok: true };
 }
 
+// Campanhas (sub-IDs) digitadas por produto. Ficam só no produto principal; entram no link de afiliado.
+function limparCampanhas(lista) {
+  const out = [];
+  for (const c of Array.isArray(lista) ? lista : []) {
+    const v = String(c || "").replace(/[^\p{L}\p{N} -]/gu, "").replace(/\s+/g, " ").trim().slice(0, 60);
+    if (v && !out.includes(v)) out.push(v);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
+async function regenerarLinkComCampanhas(itemId, userId = requireUserId()) {
+  const supabase = getSupabase();
+  const { data: row } = await supabase
+    .from("product_backups")
+    .select("link_produto,shop_id,campanhas")
+    .eq("user_id", userId)
+    .eq("item_id", String(itemId))
+    .maybeSingle();
+  if (!row) return;
+  const origin = row.link_produto || (row.shop_id ? `https://shopee.com.br/product/${row.shop_id}/${itemId}` : "");
+  if (!origin) return;
+  try {
+    const link = await generateAffiliateShortLink(origin, Array.isArray(row.campanhas) ? row.campanhas : []);
+    const novo = String(link?.shortLink || link?.longLink || "");
+    if (novo) {
+      await supabase
+        .from("product_backups")
+        .update({ link_afiliado: novo.slice(0, 800) })
+        .eq("user_id", userId)
+        .eq("item_id", String(itemId));
+    }
+  } catch (err) {
+    console.warn("[backup] regenerar link com campanhas falhou:", err.message);
+  }
+}
+
+async function salvarCampanhas(itemId, campanhas, userId = requireUserId()) {
+  const lista = limparCampanhas(campanhas);
+  const { error } = await getSupabase()
+    .from("product_backups")
+    .update({ campanhas: lista })
+    .eq("user_id", userId)
+    .eq("item_id", String(itemId));
+  if (error) throw new Error(error.message);
+  await regenerarLinkComCampanhas(itemId, userId);
+  return { campanhas: lista };
+}
+
 async function trocarPrincipal(grupoId, novoPrincipalItemId, motivo = "", userId = requireUserId()) {
   const supabase = getSupabase();
   const novo = String(novoPrincipalItemId);
@@ -1185,6 +1235,25 @@ async function trocarPrincipal(grupoId, novoPrincipalItemId, motivo = "", userId
     .eq("user_id", userId)
     .eq("id", grupoId);
   if (upErr) throw new Error(upErr.message);
+  // As campanhas acompanham a principal: passam para o novo principal e saem do antigo.
+  const supabase2 = getSupabase();
+  const { data: camp } = await supabase2
+    .from("product_backups")
+    .select("item_id,campanhas")
+    .eq("user_id", userId)
+    .in("item_id", [antigo, novo]);
+  const campAntigo = (camp || []).find((r) => String(r.item_id) === antigo)?.campanhas || [];
+  const campNovo = (camp || []).find((r) => String(r.item_id) === novo)?.campanhas || [];
+  if (antigo) {
+    await supabase2.from("product_backups").update({ campanhas: [] }).eq("user_id", userId).eq("item_id", antigo);
+  }
+  await supabase2
+    .from("product_backups")
+    .update({ campanhas: limparCampanhas([...campNovo, ...campAntigo]) })
+    .eq("user_id", userId)
+    .eq("item_id", novo);
+  if (antigo) await regenerarLinkComCampanhas(antigo, userId);
+  await regenerarLinkComCampanhas(novo, userId);
   return { ok: true };
 }
 
@@ -1669,6 +1738,7 @@ async function garimpoContextual(body = {}, userId = requireUserId()) {
 
 module.exports = {
   lookupProduto,
+  salvarCampanhas,
   searchProdutosApi,
   salvarBackup,
   listarBackups,

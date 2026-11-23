@@ -63,6 +63,7 @@ const {
   generateAffiliateShortLink,
   radarSupercomissoes,
   garimpoContextual,
+  salvarCampanhas,
 } = require("./backup");
 const { runAutoSync, cronAuthorized, startLocalAutoSync } = require("./autoSync");
 const { saveSubscription, getPublicKey } = require("./pushNotify");
@@ -1142,6 +1143,16 @@ async function requestHandler(req, res) {
           return;
         }
 
+        if (pathname === "/api/backup/campanhas" && req.method === "POST") {
+          const body = await readBody(req);
+          try {
+            const r = await salvarCampanhas(body.itemId, body.campanhas);
+            sendJson(res, 200, { success: true, ...r });
+          } catch (err) {
+            sendJson(res, 400, { success: false, error: err.message });
+          }
+          return;
+        }
         if (pathname === "/api/backup/grupos/swap" && req.method === "POST") {
           const body = await readBody(req);
           try {
