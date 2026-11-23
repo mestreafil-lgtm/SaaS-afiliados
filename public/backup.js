@@ -560,7 +560,7 @@
 
   // Queda de comissão pendente (não vista) aparece no próprio card do produto.
   function quedaComissaoHtml(p) {
-    const a = (p?.alertas || []).find((x) => x && TIPOS_CARD_COMISSAO.includes(x.tipo) && x.visto !== true);
+    const a = (p?.alertas || []).find((x) => x && ["comissao_caiu", "comissao_zero"].includes(x.tipo) && x.visto !== true);
     if (!a) return "";
     const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
     const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
