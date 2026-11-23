@@ -1663,9 +1663,9 @@
 .bk-aviso-linha{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #e5e7eb;}
 .bk-aviso-linha:first-child{border-top:0;}
 .bk-aviso-rot{display:block;font-size:11px;font-weight:600;color:#6b7280;}
-.bk-aviso-txt{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:13px;color:#182230;}
+.bk-aviso-txt{display:block;font-size:13px;line-height:1.9;color:#182230;}
 .bk-aviso-linha button{font:inherit;font-size:12px;font-weight:700;color:#fff;background:#ee4d2d;border:0;border-radius:0.4rem;padding:4px 10px;cursor:pointer;white-space:nowrap;}
 .bk-acts-icons button.danger{color:#b91c1c;border:1px solid #e5e7eb;background:#fff;}
 
-.bk-val-antigo{color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:0 8px;font-weight:700;white-space:nowrap;}
-.bk-val-novo{color:#ee4d2d;background:#fff0eb;border:1px solid #fed7aa;border-radius:999px;padding:0 8px;font-weight:700;white-space:nowrap;}
+.bk-val-antigo{display:inline-block;line-height:1.5;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:0 8px;font-weight:700;white-space:nowrap;}
+.bk-val-novo{display:inline-block;line-height:1.5;color:#ee4d2d;background:#fff0eb;border:1px solid #fed7aa;border-radius:999px;padding:0 8px;font-weight:700;white-space:nowrap;}
