@@ -1647,7 +1647,7 @@
 .bk-banner-fila{font-size:12px;color:#6B7280;white-space:nowrap;}
 .bk-banner-txt{flex:1;font-size:14px;color:#111827;min-width:0;}
 .bk-banner-txt b{color:#c2410c;font-weight:600;}
-.bk-banner-ok{font:inherit;font-size:13px;font-weight:600;border-radius:8px;padding:7px 14px;background:#7c3aed;border:1px solid #7c3aed;color:#fff;cursor:pointer;white-space:nowrap;}
+.bk-banner-ok{font:inherit;font-size:13px;font-weight:600;border-radius:8px;padding:7px 14px;background:#ee4d2d;border:1px solid #ee4d2d;color:#fff;cursor:pointer;white-space:nowrap;}
 .bk-banner-ok:disabled{opacity:.6;cursor:default;}
 .bk-banner-x{background:transparent;border:0;font-size:20px;line-height:1;color:#6B7280;cursor:pointer;padding:0 4px;}
 
@@ -1655,11 +1655,11 @@
 .bk-rstatus.is-erro { color: #b91c1c; }
 
 .bk-flash{outline:2px solid #f97316;outline-offset:3px;border-radius:12px;transition:outline-color .6s;}
-.bk-banner-com .bk-banner-txt .bk-banner-nome{background:none;border:0;padding:0;font:inherit;font-weight:600;color:#c2410c;text-decoration:underline;cursor:pointer;}
+.bk-banner-com .bk-banner-txt .bk-banner-nome{background:none;border:0;padding:0;font:inherit;font-weight:600;color:#ee4d2d;text-decoration:underline;cursor:pointer;}
 .bk-acts-icons{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
 .bk-acts-icons button{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 8px;font-size:12px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155;cursor:pointer;}
 .bk-acts-icons button.danger,.bk-acts-icons button.del{color:#b91c1c;}
 .bk-avisos-pill{margin-top:8px;font-size:12px;font-weight:700;color:#ee4d2d;background:#fff0eb;border:1px solid #fed7aa;border-radius:999px;padding:3px 10px;cursor:pointer;}
-.bk-avisos-lista{margin-top:8px;display:flex;flex-direction:column;gap:6px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:8px;}
-.bk-aviso-linha{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;}
-.bk-aviso-linha button{font-size:12px;font-weight:700;color:#7c3aed;background:none;border:0;cursor:pointer;text-decoration:underline;}
+.bk-avisos-lista{margin-top:8px;display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;}
+.bk-aviso-linha{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#182230;}
+.bk-aviso-linha button{font:inherit;font-size:12px;font-weight:700;color:#fff;background:#ee4d2d;border:0;border-radius:0.4rem;padding:4px 10px;cursor:pointer;white-space:nowrap;}
