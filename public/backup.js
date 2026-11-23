@@ -583,6 +583,16 @@
     return `<div class="bk-queda-com">${txt}</div>`;
   }
 
+  // Aumento de preço (R$ 5 ou mais) aparece no card, sem banner e sem push.
+  function altaPrecoHtml(p) {
+    const a = (p?.alertas || []).find((x) => x && x.tipo === "preco_subiu" && x.visto !== true);
+    if (!a) return "";
+    const txt = a.de != null && a.para != null
+      ? `Preço subiu de ${fmt(a.de)} para ${fmt(a.para)}`
+      : escapeHtml(a.mensagem || "Preço subiu");
+    return `<div class="bk-alta-preco">${txt}</div>`;
+  }
+
   function produtoTile(p, badge, isPrincipal, grupoId, sugestao) {
     if (!p) return "";
     const comR = comissaoBRL(p);
@@ -594,7 +604,7 @@
         <div class="bk-tile-price">${fmt(p.preco)}</div>
         <div><span class="bk-tile-com">${Number(p.comissao_pct || 0)}% comissão</span>
           ${comR > 0 ? `<span class="bk-tile-brl"> +${fmt(comR)}</span>` : ""}</div>
-        ${quedaComissaoHtml(p)}
+        ${quedaComissaoHtml(p)}${altaPrecoHtml(p)}
         ${p.vendas_shopee ? `<div class="bk-meta">${fmtNum(p.vendas_shopee)} vendidos</div>` : ""}
         ${starsHtml(p.rating)}
         <div class="bk-tile-acts">
@@ -647,7 +657,7 @@
       <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
       <div class="bk-vinc-price">${fmt(p.preco)}</div>
       <div class="bk-meta"><b>${Number(p.comissao_pct || 0)}%</b> · ${fmt(comR)} · ${fmtNum(p.vendas_shopee || 0)} vendidos</div>
-      ${quedaComissaoHtml(p)}
+      ${quedaComissaoHtml(p)}${altaPrecoHtml(p)}
       <div class="bk-vinc-acts">
         <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}">Tornar principal</button>
         <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Copiar link">Copiar link</button>
