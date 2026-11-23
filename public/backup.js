@@ -573,6 +573,16 @@
     return `<div class="bk-stars" aria-label="${raw.toFixed(1)} de 5">${"★".repeat(n)}${"☆".repeat(5 - n)} <span>${raw.toFixed(1)}</span></div>`;
   }
 
+  // Queda de comissão pendente (não vista) aparece no próprio card do produto.
+  function quedaComissaoHtml(p) {
+    const a = (p?.alertas || []).find((x) => x && TIPOS_CARD_COMISSAO.includes(x.tipo) && x.visto !== true);
+    if (!a) return "";
+    const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
+    const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
+    const txt = a.tipo === "comissao_zero" ? "Comissão zerou" : `Comissão caiu de ${de} para ${para}`;
+    return `<div class="bk-queda-com">${txt}</div>`;
+  }
+
   function produtoTile(p, badge, isPrincipal, grupoId, sugestao) {
     if (!p) return "";
     const comR = comissaoBRL(p);
@@ -584,6 +594,7 @@
         <div class="bk-tile-price">${fmt(p.preco)}</div>
         <div><span class="bk-tile-com">${Number(p.comissao_pct || 0)}% comissão</span>
           ${comR > 0 ? `<span class="bk-tile-brl"> +${fmt(comR)}</span>` : ""}</div>
+        ${quedaComissaoHtml(p)}
         ${p.vendas_shopee ? `<div class="bk-meta">${fmtNum(p.vendas_shopee)} vendidos</div>` : ""}
         ${starsHtml(p.rating)}
         <div class="bk-tile-acts">
@@ -636,6 +647,7 @@
       <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
       <div class="bk-vinc-price">${fmt(p.preco)}</div>
       <div class="bk-meta"><b>${Number(p.comissao_pct || 0)}%</b> · ${fmt(comR)} · ${fmtNum(p.vendas_shopee || 0)} vendidos</div>
+      ${quedaComissaoHtml(p)}
       <div class="bk-vinc-acts">
         <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}">Tornar principal</button>
         <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Copiar link">Copiar link</button>
