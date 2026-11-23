@@ -631,7 +631,8 @@ async function editarBackupMeta(itemId, { apelido, marcadoPrincipal } = {}, user
   return { ok: true };
 }
 
-const TIPOS_ALERTA_COMISSAO = ["comissao_caiu", "comissao_zero"];
+// Avisos que ficam pendentes até o Ciente e podem virar push: queda de comissão e aumento de preço.
+const TIPOS_ALERTA_AVISO = ["comissao_caiu", "comissao_zero", "preco_subiu"];
 
 // Alertas de queda de comissão ficam pendentes até o usuário marcar "Ciente".
 // Um alerta já marcado como visto não volta enquanto a queda for a mesma.
@@ -639,15 +640,15 @@ function mesclarAlertasComissao(anteriores, novos) {
   const agora = new Date().toISOString();
   const antigos = Array.isArray(anteriores) ? anteriores : [];
   const pendentesAntigos = antigos.filter(
-    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto !== true
+    (a) => a && TIPOS_ALERTA_AVISO.includes(a.tipo) && a.visto !== true
   );
   const vistosAntigos = antigos.filter(
-    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto === true
+    (a) => a && TIPOS_ALERTA_AVISO.includes(a.tipo) && a.visto === true
   );
   const mesmoAlerta = (x, y) => x.tipo === y.tipo && x.de === y.de && x.para === y.para;
 
   const novosComissao = (novos || [])
-    .filter((a) => TIPOS_ALERTA_COMISSAO.includes(a.tipo))
+    .filter((a) => TIPOS_ALERTA_AVISO.includes(a.tipo))
     .filter((a) => !vistosAntigos.some((v) => mesmoAlerta(v, a)))
     .map((a) => {
       const ja = pendentesAntigos.find((p) => p.tipo === a.tipo);
@@ -660,7 +661,7 @@ function mesclarAlertasComissao(anteriores, novos) {
   // Fila do Robô de Garimpo é guardada na rodada diária; não some ao atualizar o produto.
   const sugestoesPendentes = antigos.filter((a) => a && (a.tipo === "robo_fila" || a.tipo === "robo_excluido"));
   const outros = (novos || []).filter(
-    (a) => !TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.tipo !== "robo_fila" && a.tipo !== "robo_excluido"
+    (a) => !TIPOS_ALERTA_AVISO.includes(a.tipo) && a.tipo !== "robo_fila" && a.tipo !== "robo_excluido"
   );
   return [...pendentesMantidos, ...novosComissao, ...sugestoesPendentes, ...outros];
 }
@@ -903,11 +904,11 @@ async function atualizarBackup(itemId, userId = requireUserId()) {
   const alertas = mesclarAlertasComissao(atual.alertas, alertasNovos);
   // Avisos de comissão que surgiram agora (ainda não estavam pendentes): usados para o Telegram.
   const jaPendentes = (Array.isArray(atual.alertas) ? atual.alertas : []).filter(
-    (a) => a && TIPOS_ALERTA_COMISSAO.includes(a.tipo) && a.visto !== true
+    (a) => a && TIPOS_ALERTA_AVISO.includes(a.tipo) && a.visto !== true
   );
   const papel = await papelDoProduto(String(itemId), userId);
   const novosAvisos = alertasNovos
-    .filter((a) => TIPOS_ALERTA_COMISSAO.includes(a.tipo))
+    .filter((a) => TIPOS_ALERTA_AVISO.includes(a.tipo))
     .filter((a) => !jaPendentes.some((p) => p.tipo === a.tipo))
     .map((a) => ({ ...a, nome: atual.apelido || novo.nome, papel, itemId: String(itemId) }));
   const row = {
