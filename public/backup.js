@@ -1467,6 +1467,8 @@
           body: JSON.stringify({ itemId: btn.dataset.id, tipo: btn.dataset.tipo }),
         });
         await loadBackups();
+        await loadGrupos();
+        await renderGrupos();
         await refreshStats();
       } catch (err) {
         btn.disabled = false;
@@ -1665,6 +1667,8 @@
         try {
           await api("/api/backup/alertas/visto", { method: "POST", body: JSON.stringify({ itemId: ciente.dataset.id, tipo: ciente.dataset.tipo }) });
           await loadBackups();
+          await loadGrupos();
+          await renderGrupos();
           await refreshStats();
         } catch (err) {
           ciente.disabled = false;
