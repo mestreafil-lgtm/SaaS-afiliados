@@ -1654,8 +1654,6 @@
 .bk-rstatus { margin-top: 0.3rem; }
 .bk-rstatus.is-erro { color: #b91c1c; }
 
-.bk-banner-ir{cursor:pointer;}
-.bk-banner-ir:hover b{text-decoration:underline;}
 .bk-flash{outline:2px solid #f97316;outline-offset:3px;border-radius:12px;transition:outline-color .6s;}
 .bk-queda-com{margin-top:6px;background:#fff7ed;border:1px solid #fdba74;color:#c2410c;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:600;}
 .bk-alta-preco{margin-top:6px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:600;}
