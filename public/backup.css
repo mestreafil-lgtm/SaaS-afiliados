@@ -1657,9 +1657,11 @@
 .bk-flash{outline:2px solid #f97316;outline-offset:3px;border-radius:12px;transition:outline-color .6s;}
 .bk-banner-com .bk-banner-txt .bk-banner-nome{background:none;border:0;padding:0;font:inherit;font-weight:600;color:#ee4d2d;text-decoration:underline;cursor:pointer;}
 .bk-acts-icons{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-.bk-acts-icons button{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 8px;font-size:12px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155;cursor:pointer;}
-.bk-acts-icons button.danger,.bk-acts-icons button.del{color:#b91c1c;}
+.bk-acts-icons button{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 8px;font-size:12px;cursor:pointer;}
 .bk-avisos-pill{margin-top:8px;font-size:12px;font-weight:700;color:#ee4d2d;background:#fff0eb;border:1px solid #fed7aa;border-radius:999px;padding:3px 10px;cursor:pointer;}
-.bk-avisos-lista{margin-top:8px;display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px;}
-.bk-aviso-linha{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#182230;}
+.bk-avisos-lista{margin-top:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:0 10px;}
+.bk-aviso-linha{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #e5e7eb;}
+.bk-aviso-linha:first-child{border-top:0;}
+.bk-aviso-rot{display:block;font-size:11px;font-weight:600;color:#6b7280;}
+.bk-aviso-txt{display:block;font-size:13px;color:#182230;}
 .bk-aviso-linha button{font:inherit;font-size:12px;font-weight:700;color:#fff;background:#ee4d2d;border:0;border-radius:0.4rem;padding:4px 10px;cursor:pointer;white-space:nowrap;}

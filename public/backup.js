@@ -567,9 +567,9 @@
   }
 
   function textoAviso(a) {
-    if (a.tipo === "comissao_zero") return "Comissão zerou";
-    if (a.tipo === "preco_subiu") return `Preço subiu de ${fmt(a.de)} para ${fmt(a.para)}`;
-    return `Comissão caiu de ${escapeHtml(String(a.de))}% para ${escapeHtml(String(a.para))}%`;
+    if (a.tipo === "comissao_zero") return { rotulo: "Comissão", texto: "Zerou" };
+    if (a.tipo === "preco_subiu") return { rotulo: "Preço", texto: `Subiu de ${fmt(a.de)} para ${fmt(a.para)}` };
+    return { rotulo: "Comissão", texto: `Caiu de ${escapeHtml(String(a.de))}% para ${escapeHtml(String(a.para))}%` };
   }
 
   function avisosCardHtml(p) {
@@ -579,7 +579,10 @@
     const aberto = Boolean(avisosAbertos[String(p.itemId)]);
     const pill = `<button type="button" class="bk-avisos-pill" data-act="toggle-avisos" data-id="${id}" aria-expanded="${aberto ? "true" : "false"}">${pend.length} ${pend.length === 1 ? "aviso" : "avisos"}</button>`;
     if (!aberto) return pill;
-    const linhas = pend.map((a) => `<div class="bk-aviso-linha"><span>${textoAviso(a)}</span><button type="button" data-act="alerta-visto" data-id="${id}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button></div>`).join("");
+    const linhas = pend.map((a) => {
+      const t = textoAviso(a);
+      return `<div class="bk-aviso-linha"><div><span class="bk-aviso-rot">${t.rotulo}</span><span class="bk-aviso-txt">${t.texto}</span></div><button type="button" data-act="alerta-visto" data-id="${id}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button></div>`;
+    }).join("");
     return `${pill}<div class="bk-avisos-lista">${linhas}</div>`;
   }
 
