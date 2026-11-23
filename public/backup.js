@@ -558,24 +558,29 @@
     return `<div class="bk-stars" aria-label="${raw.toFixed(1)} de 5">${"★".repeat(n)}${"☆".repeat(5 - n)} <span>${raw.toFixed(1)}</span></div>`;
   }
 
-  // Queda de comissão pendente (não vista) aparece no próprio card do produto.
-  function quedaComissaoHtml(p) {
-    const a = (p?.alertas || []).find((x) => x && ["comissao_caiu", "comissao_zero"].includes(x.tipo) && x.visto !== true);
-    if (!a) return "";
-    const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
-    const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
-    const txt = a.tipo === "comissao_zero" ? "Comissão zerou" : `Comissão caiu de ${de} para ${para}`;
-    return `<span class="bk-seta bk-seta-queda" title="${txt}"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> ${para}</span>`;
+  // Avisos pendentes do produto: um selo no card; ao clicar, abre a lista com "Ciente" em cada um.
+  const TIPOS_AVISO_CARD = ["comissao_caiu", "comissao_zero", "preco_subiu"];
+  const avisosAbertos = {};
+
+  function avisosPendentes(p) {
+    return (p?.alertas || []).filter((x) => x && TIPOS_AVISO_CARD.includes(x.tipo) && x.visto !== true);
   }
 
-  // Aumento de preço (R$ 5 ou mais) aparece no card, sem banner e sem push.
-  function altaPrecoHtml(p) {
-    const a = (p?.alertas || []).find((x) => x && x.tipo === "preco_subiu" && x.visto !== true);
-    if (!a) return "";
-    const txt = a.de != null && a.para != null
-      ? `Preço subiu de ${fmt(a.de)} para ${fmt(a.para)}`
-      : escapeHtml(a.mensagem || "Preço subiu");
-    return `<span class="bk-seta bk-seta-alta" title="${txt}"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i> ${fmt(a.para)}</span>`;
+  function textoAviso(a) {
+    if (a.tipo === "comissao_zero") return "Comissão zerou";
+    if (a.tipo === "preco_subiu") return `Preço subiu de ${fmt(a.de)} para ${fmt(a.para)}`;
+    return `Comissão caiu de ${escapeHtml(String(a.de))}% para ${escapeHtml(String(a.para))}%`;
+  }
+
+  function avisosCardHtml(p) {
+    const pend = avisosPendentes(p);
+    if (!pend.length) return "";
+    const id = escapeHtml(p.itemId);
+    const aberto = Boolean(avisosAbertos[String(p.itemId)]);
+    const pill = `<button type="button" class="bk-avisos-pill" data-act="toggle-avisos" data-id="${id}" aria-expanded="${aberto ? "true" : "false"}">${pend.length} ${pend.length === 1 ? "aviso" : "avisos"}</button>`;
+    if (!aberto) return pill;
+    const linhas = pend.map((a) => `<div class="bk-aviso-linha"><span>${textoAviso(a)}</span><button type="button" data-act="alerta-visto" data-id="${id}" data-tipo="${escapeHtml(a.tipo)}">Ciente</button></div>`).join("");
+    return `${pill}<div class="bk-avisos-lista">${linhas}</div>`;
   }
 
   function produtoTile(p, badge, isPrincipal, grupoId, sugestao) {
@@ -586,9 +591,10 @@
       ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph"><i class="fa-solid fa-box"></i></div>`}
       <div class="bk-tile-body">
         <div class="bk-tile-name">${escapeHtml(p.apelido || p.nome || "")}</div>
-        <div class="bk-tile-price">${fmt(p.preco)} ${altaPrecoHtml(p)}</div>
+        <div class="bk-tile-price">${fmt(p.preco)}</div>
         <div><span class="bk-tile-com">${Number(p.comissao_pct || 0)}% comissão</span>
-          ${comR > 0 ? `<span class="bk-tile-brl"> +${fmt(comR)}</span>` : ""} ${quedaComissaoHtml(p)}</div>
+          ${comR > 0 ? `<span class="bk-tile-brl"> +${fmt(comR)}</span>` : ""}</div>
+        ${avisosCardHtml(p)}
         ${p.vendas_shopee ? `<div class="bk-meta">${fmtNum(p.vendas_shopee)} vendidos</div>` : ""}
         ${starsHtml(p.rating)}
         <div class="bk-tile-acts bk-acts-icons">
@@ -639,8 +645,9 @@
       <div class="bk-vinc-tag">Backup ${n}</div>
       ${p.imagem ? `<img src="${escapeHtml(p.imagem)}" alt="" loading="lazy" />` : `<div class="bk-tile-ph bk-vinc-ph"><i class="fa-solid fa-box"></i></div>`}
       <div class="bk-vinc-name">${escapeHtml(p.apelido || p.nome || "")}</div>
-      <div class="bk-vinc-price">${fmt(p.preco)} ${altaPrecoHtml(p)}</div>
-      <div class="bk-meta"><b>${Number(p.comissao_pct || 0)}%</b> · ${fmt(comR)} · ${fmtNum(p.vendas_shopee || 0)} vendidos ${quedaComissaoHtml(p)}</div>
+      <div class="bk-vinc-price">${fmt(p.preco)}</div>
+      <div class="bk-meta"><b>${Number(p.comissao_pct || 0)}%</b> · ${fmt(comR)} · ${fmtNum(p.vendas_shopee || 0)} vendidos</div>
+      ${avisosCardHtml(p)}
       <div class="bk-vinc-acts bk-acts-icons">
         <button type="button" data-act="make-principal" data-gid="${escapeHtml(grupoId)}" data-id="${escapeHtml(p.itemId)}" title="Tornar principal" aria-label="Tornar principal"><i class="fa-solid fa-star" aria-hidden="true"></i> Tornar principal</button>
         <button type="button" data-act="copy-tile" data-link="${escapeHtml(p.linkAfiliado || p.linkProduto || "")}" title="Copiar link" aria-label="Copiar link"><i class="fa-solid fa-copy" aria-hidden="true"></i> Copiar link</button>
@@ -1640,6 +1647,29 @@
         await refreshStats();
       } catch (err) {
         alert(err.message || String(err));
+      }
+    });
+
+    $("#backup-root")?.addEventListener("click", async (e) => {
+      const pill = e.target.closest("[data-act='toggle-avisos']");
+      if (pill) {
+        const k = String(pill.dataset.id);
+        avisosAbertos[k] = !avisosAbertos[k];
+        await renderGrupos();
+        if (state.tab === "listagem") await renderListagem();
+        return;
+      }
+      const ciente = e.target.closest("[data-act='alerta-visto']");
+      if (ciente) {
+        ciente.disabled = true;
+        try {
+          await api("/api/backup/alertas/visto", { method: "POST", body: JSON.stringify({ itemId: ciente.dataset.id, tipo: ciente.dataset.tipo }) });
+          await loadBackups();
+          await refreshStats();
+        } catch (err) {
+          ciente.disabled = false;
+          alert(err.message || String(err));
+        }
       }
     });
 
