@@ -319,14 +319,12 @@
     }
     const { b, a } = itens[0];
     const nome = b.apelido || b.nome || "Produto";
-    const de = a.de != null ? `${escapeHtml(String(a.de))}%` : "";
-    const para = a.para != null ? `${escapeHtml(String(a.para))}%` : "";
     const id = escapeHtml(b.itemId);
     const tipo = escapeHtml(a.tipo);
     box.innerHTML = `
       <div class="bk-banner-com">
         <span class="bk-banner-fila">1 de ${itens.length}</span>
-        <div class="bk-banner-txt bk-banner-ir" role="button" tabindex="0" data-act="ir-produto" data-id="${id}" title="Ver produto">Comissão caiu: <b>${escapeHtml(nome)}</b>, de ${de} para ${para}.</div>
+        <div class="bk-banner-txt bk-banner-ir" role="button" tabindex="0" data-act="ir-produto" data-id="${id}" title="Ver produto">Comissão caiu: <b>${escapeHtml(nome)}</b></div>
         <button type="button" class="bk-banner-ok" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}">Ciente</button>
         <button type="button" class="bk-banner-x" data-act="alerta-visto" data-id="${id}" data-tipo="${tipo}" aria-label="Fechar">×</button>
       </div>`;
