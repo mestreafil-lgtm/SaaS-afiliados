@@ -1667,5 +1667,5 @@
 .bk-aviso-linha button{font:inherit;font-size:12px;font-weight:700;color:#fff;background:#ee4d2d;border:0;border-radius:0.4rem;padding:4px 10px;cursor:pointer;white-space:nowrap;}
 .bk-acts-icons button.danger{color:#b91c1c;border:1px solid #e5e7eb;background:#fff;}
 
-.bk-val-antigo{color:#16a34a;font-weight:700;}
-.bk-val-novo{color:#ee4d2d;font-weight:700;}
+.bk-val-antigo{color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:0 8px;font-weight:700;}
+.bk-val-novo{color:#ee4d2d;background:#fff0eb;border:1px solid #fed7aa;border-radius:999px;padding:0 8px;font-weight:700;}
