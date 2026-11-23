@@ -194,51 +194,6 @@
     if (e && em != null) e.textContent = em;
   }
 
-  const GARIMPO_KEY = "afilia:backup_garimpo_settings";
-  const GARIMPO_DEFAULT = { precoToleranciaAcimaPct: 15, precoToleranciaAbaixoPct: 25 };
-
-  function readGarimpoSettings() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(GARIMPO_KEY) || "{}");
-      const clamp = (v, fb) => {
-        const n = Number(v);
-        return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : fb;
-      };
-      return {
-        precoToleranciaAcimaPct: clamp(parsed.precoToleranciaAcimaPct, 15),
-        precoToleranciaAbaixoPct: clamp(parsed.precoToleranciaAbaixoPct, 25),
-      };
-    } catch {
-      return { ...GARIMPO_DEFAULT };
-    }
-  }
-
-  function writeGarimpoSettings(settings) {
-    const next = readGarimpoSettings();
-    if (settings.precoToleranciaAcimaPct != null) next.precoToleranciaAcimaPct = settings.precoToleranciaAcimaPct;
-    if (settings.precoToleranciaAbaixoPct != null) next.precoToleranciaAbaixoPct = settings.precoToleranciaAbaixoPct;
-    const clamp = (v, fb) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : fb;
-    };
-    const saved = {
-      precoToleranciaAcimaPct: clamp(next.precoToleranciaAcimaPct, 15),
-      precoToleranciaAbaixoPct: clamp(next.precoToleranciaAbaixoPct, 25),
-    };
-    localStorage.setItem(GARIMPO_KEY, JSON.stringify(saved));
-    return saved;
-  }
-
-  function faixaGarimpo(preco, settings) {
-    const base = Number(String(preco || "").replace(/\./g, "").replace(",", ".")) || Number(preco) || 0;
-    if (!(base > 0)) return null;
-    const s = settings || readGarimpoSettings();
-    return {
-      min: base * (1 - s.precoToleranciaAbaixoPct / 100),
-      max: base * (1 + s.precoToleranciaAcimaPct / 100),
-    };
-  }
-
   function isSinalCritico(b) {
     const preco = Number(b.preco || 0);
     const pct = Number(b.comissao_pct || 0);
@@ -910,9 +865,6 @@
             apelido: principal.apelido || "",
             preco: principal.preco,
             excludeItemIds: exclude,
-            precoToleranciaAcimaPct: 5,
-            comissaoMinBRL: 5,
-            vendasMin: 0,
             limite: 10,
             usarIA: true,
             principal: { imagem: principal.imagem || "" },
@@ -939,7 +891,7 @@
       const rodape = `<div class="bk-meta">Busca ${roboTempoAtras(cache.ts)} · ${visiveis.length} na fila</div>`;
       const corpo = visiveis.length
         ? roboRowHtml(visiveis[0], grupo, ordenados, cheio)
-        : `<div class="bk-meta">Nenhuma derivada nova com os critérios: até 5% acima do preço e comissão mínima R$ 5. Use o botão de atualizar para buscar de novo.</div>`;
+        : `<div class="bk-meta">Nenhuma derivada nova com os critérios: até 5% acima do preço, comissão mínima e vendas mínimas definidas em Configurações. Use o botão de atualizar para buscar de novo.</div>`;
       box.innerHTML = aviso + corpo + rodape;
     } catch (err) {
       box.innerHTML = `<div class="bk-error">${escapeHtml(err.message)}</div>`;
@@ -1098,32 +1050,56 @@
     updateTabLabels();
   }
 
-  function renderConfig() {
-    const s = readGarimpoSettings();
-    const acima = $("#bk-gar-acima");
-    const abaixo = $("#bk-gar-abaixo");
-    const acimaN = $("#bk-gar-acima-n");
-    const abaixoN = $("#bk-gar-abaixo-n");
-    if (acima) acima.value = s.precoToleranciaAcimaPct;
-    if (abaixo) abaixo.value = s.precoToleranciaAbaixoPct;
-    if (acimaN) acimaN.value = s.precoToleranciaAcimaPct;
-    if (abaixoN) abaixoN.value = s.precoToleranciaAbaixoPct;
-    paintFaixaGarimpo();
+  async function carregarCriteriosGarimpo() {
+    // Comissão e vendas mínimas ficam salvas na conta do usuário (usadas pelo robô no servidor).
+    try {
+      const r = await api("/api/settings");
+      const s = r?.settings || r || {};
+      if ($("#bk-gar-comissao-min")) $("#bk-gar-comissao-min").value = String(s.backupComissaoMin ?? 5);
+      if ($("#bk-gar-vendas-min")) $("#bk-gar-vendas-min").value = String(s.backupVendasMin ?? 100);
+      if ($("#bk-gar-alerta-preco-min")) $("#bk-gar-alerta-preco-min").value = String(s.backupPrecoAlertaMin ?? 0.01);
+      setFaixa("acima", s.backupPrecoAcimaPct ?? 15);
+      setFaixa("abaixo", s.backupPrecoAbaixoPct ?? 25);
+    } catch (_) { /* mantém os valores padrão do HTML */ }
   }
 
-  function paintFaixaGarimpo() {
-    const raw = $("#bk-gar-exemplo")?.value || "99.90";
-    const n = Number(String(raw).replace(/\./g, "").replace(",", ".")) || Number(raw) || 0;
-    const faixa = faixaGarimpo(n, {
-      precoToleranciaAcimaPct: Number($("#bk-gar-acima")?.value || 15),
-      precoToleranciaAbaixoPct: Number($("#bk-gar-abaixo")?.value || 25),
-    });
-    const el = $("#bk-gar-faixa");
-    if (!el) return;
-    el.innerHTML = faixa
-      ? `Garimpo aceita ofertas entre <b>${fmt(faixa.min)}</b> e <b>${fmt(faixa.max)}</b>`
-      : "Informe um preço válido para ver a faixa.";
+  function setFaixa(which, valor) {
+    const v = Math.min(100, Math.max(0, Math.round(Number(valor) || 0)));
+    const range = $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo");
+    const num = $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n");
+    if (range) range.value = v;
+    if (num) num.value = v;
   }
+
+  async function salvarCriteriosGarimpo() {
+    const comissao = Math.max(0, parseFloat($("#bk-gar-comissao-min")?.value || "5") || 0);
+    const vendas = Math.max(0, Math.round(Number($("#bk-gar-vendas-min")?.value || 100)));
+    const acima = Math.min(100, Math.max(0, Math.round(Number($("#bk-gar-acima-n")?.value || 15))));
+    const abaixo = Math.min(100, Math.max(0, Math.round(Number($("#bk-gar-abaixo-n")?.value || 25))));
+    const alertaPreco = Math.max(0.01, parseFloat($("#bk-gar-alerta-preco-min")?.value || "0.01") || 0.01);
+    const st = $("#backup-cfg-status");
+    try {
+      await api("/api/settings", {
+        method: "POST",
+        body: JSON.stringify({
+          backupComissaoMin: comissao,
+          backupVendasMin: vendas,
+          backupPrecoAcimaPct: acima,
+          backupPrecoAbaixoPct: abaixo,
+          backupPrecoAlertaMin: alertaPreco,
+        }),
+      });
+      state.roboCache = {};
+      if (st) { st.className = "form-status ok"; st.textContent = "Critérios do garimpo salvos na sua conta."; }
+    } catch (err) {
+      if (st) { st.className = "form-status err"; st.textContent = `Não consegui salvar: ${err.message}`; }
+    }
+  }
+
+  function renderConfig() {
+    carregarCriteriosGarimpo();
+  }
+
 
   function openModalCriarGrupo() {
     const livres = state.backups.filter((b) => !b.grupoId);
@@ -1511,28 +1487,32 @@
       const range = $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo");
       const num = $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n");
       const val = Number((document.activeElement === num ? num : range)?.value || 0);
-      if (range) range.value = val;
-      if (num) num.value = val;
-      writeGarimpoSettings({
-        precoToleranciaAcimaPct: Number($("#bk-gar-acima")?.value || 15),
-        precoToleranciaAbaixoPct: Number($("#bk-gar-abaixo")?.value || 25),
-      });
+      setFaixa(which, val);
       state.roboCache = {};
-      paintFaixaGarimpo();
-      const st = $("#backup-cfg-status");
-      if (st) { st.className = "form-status ok"; st.textContent = "Faixa do garimpo salva neste navegador."; }
     };
     ["acima", "abaixo"].forEach((which) => {
       $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo")?.addEventListener("input", () => syncGar(which));
       $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n")?.addEventListener("input", () => syncGar(which));
+      $(which === "acima" ? "#bk-gar-acima" : "#bk-gar-abaixo")?.addEventListener("change", salvarCriteriosGarimpo);
+      $(which === "acima" ? "#bk-gar-acima-n" : "#bk-gar-abaixo-n")?.addEventListener("change", salvarCriteriosGarimpo);
     });
-    $("#bk-gar-exemplo")?.addEventListener("input", paintFaixaGarimpo);
-    $("#btn-backup-cfg-reset")?.addEventListener("click", () => {
-      localStorage.removeItem(GARIMPO_KEY);
-      state.roboCache = {};
-      renderConfig();
+    $("#bk-gar-comissao-min")?.addEventListener("change", salvarCriteriosGarimpo);
+    $("#bk-gar-vendas-min")?.addEventListener("change", salvarCriteriosGarimpo);
+    $("#bk-gar-alerta-preco-min")?.addEventListener("change", salvarCriteriosGarimpo);
+    $("#btn-backup-cfg-salvar")?.addEventListener("click", async () => {
+      await salvarCriteriosGarimpo();
       const st = $("#backup-cfg-status");
-      if (st) { st.className = "form-status ok"; st.textContent = "Configurações do garimpo restauradas."; }
+      if (st && st.className.includes("ok")) st.textContent = "Configurações salvas na sua conta.";
+    });
+    $("#btn-backup-cfg-reset")?.addEventListener("click", async () => {
+      setFaixa("acima", 15);
+      setFaixa("abaixo", 25);
+      if ($("#bk-gar-comissao-min")) $("#bk-gar-comissao-min").value = "5";
+      if ($("#bk-gar-vendas-min")) $("#bk-gar-vendas-min").value = "100";
+      if ($("#bk-gar-alerta-preco-min")) $("#bk-gar-alerta-preco-min").value = "0.01";
+      await salvarCriteriosGarimpo();
+      const st = $("#backup-cfg-status");
+      if (st && st.className.includes("ok")) st.textContent = "Configurações do garimpo restauradas.";
     });
 
     $("#backup-search")?.addEventListener("input", () => {

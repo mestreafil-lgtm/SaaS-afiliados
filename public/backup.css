@@ -256,20 +256,25 @@
 .bk-kpi-foot { margin: 0; font-size: 10px; color: #94a3b8; font-weight: 600; }
 .bk-garimpo-cfg {
   background: #fff;
-  border: 1px solid #ddd6fe;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
   padding: 20px;
   max-width: 42rem;
 }
-.bk-garimpo-cfg h3 { margin: 0 0 6px; font-size: 14px; color: #4c1d95; }
-.bk-garimpo-cfg p { font-size: 12px; color: #64748b; }
+.bk-garimpo-cfg h3 { margin: 0 0 6px; font-size: 14px; color: #182230; }
+.bk-garimpo-cfg h3 i { color: #ee4d2d; }
+.bk-garimpo-cfg input[type="range"] { accent-color: #ee4d2d; }
+.bk-garimpo-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.bk-garimpo-acoes button { font: inherit; font-size: 12px; font-weight: 700; border-radius: 0.4rem; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+.bk-garimpo-acoes #btn-backup-cfg-salvar { color: #fff; background: #ee4d2d; border: 1px solid #ee4d2d; }
+.bk-garimpo-acoes #btn-backup-cfg-reset { color: #182230; background: #fff; border: 1px solid #e5e7eb; }
+.bk-garimpo-cfg input[type="number"] { border: 1px solid #e5e7eb; border-radius: 0.4rem; padding: 4px 6px; color: #182230; }
+.bk-garimpo-cfg p { font-size: 12px; color: #6b7280; }
 .bk-garimpo-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
-.bk-garimpo-sliders label { font-size: 12px; color: #334155; display: block; }
+.bk-garimpo-sliders label { font-size: 12px; color: #182230; font-weight: 600; display: block; }
 .bk-range { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .bk-range input[type="number"] { width: 64px; text-align: center; font-weight: 700; }
-.bk-garimpo-sliders small { display: block; color: #94a3b8; margin-top: 4px; }
-.bk-garimpo-sim { background: #f5f3ff; border: 1px solid #ede9fe; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
-.bk-garimpo-sim input { display: block; margin-top: 6px; max-width: 160px; font-weight: 700; }
+.bk-garimpo-sliders small { display: block; color: #6b7280; font-weight: 400; margin-top: 4px; }
 .bk-robo {
   margin-top: 12px;
   border: 1px solid #ddd6fe;
