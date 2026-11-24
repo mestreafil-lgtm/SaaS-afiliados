@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="/tailwind.css" />
   <link rel="stylesheet" href="/gemini-app.css?v=bonus-2" />
-  <link rel="stylesheet" href="/fiscal.css?v=2" />
+  <link rel="stylesheet" href="/fiscal.css?v=3" />
 </head>
 <body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen antialiased selection:bg-brand-500 selection:text-white font-sans transition-colors duration-200">
 
@@ -1011,9 +1011,10 @@
               <h3 class="span-2 fiscal-form-title">Sua empresa (afiliado)</h3>
               <label class="span-2">Razão social<input name="legalName" maxlength="180" required /></label>
               <label>Nome fantasia<input name="tradeName" maxlength="180" /></label>
-              <label>CNPJ<input name="cnpj" inputmode="numeric" maxlength="18" required /></label>
+              <label>CNPJ<span class="fiscal-input-action"><input name="cnpj" inputmode="numeric" maxlength="18" required /><button type="button" class="fiscal-btn secondary" id="fiscal-cnpj-lookup">Buscar dados</button></span><small class="fiscal-field-hint" id="fiscal-cnpj-status">Preenche razão social, município e regime pelo CNPJ.</small></label>
               <label>Inscrição municipal<input name="municipalRegistration" maxlength="40" /></label>
-              <label>Código IBGE do município<input name="municipalityCode" inputmode="numeric" maxlength="7" required /></label>
+              <label>UF da sua empresa<select id="fiscal-uf"><option value="">Escolha a UF</option></select></label>
+              <label>Município da sua empresa<select id="fiscal-city" disabled><option value="">Escolha a UF primeiro</option></select><input type="hidden" name="municipalityCode" /><small class="fiscal-field-hint" id="fiscal-city-code"></small></label>
 
               <h3 class="span-2 fiscal-form-title">Regime tributário</h3>
               <label>Regime da sua empresa<select name="taxRegime"><option value="MEI">MEI</option><option value="Simples Nacional">Simples Nacional (ME/EPP)</option><option value="Lucro Presumido">Lucro Presumido</option><option value="Lucro Real">Lucro Real</option><option value="Outro não optante">Outro (não optante do Simples)</option></select></label>
@@ -1021,7 +1022,15 @@
               <label>Regime especial<select name="specialTaxRegime"><option value="0">Nenhum</option><option value="1">Ato cooperado</option><option value="2">Estimativa</option><option value="3">Microempresa municipal</option><option value="4">Notário ou registrador</option><option value="5">Profissional autônomo</option><option value="6">Sociedade de profissionais</option><option value="9">Outros</option></select></label>
 
               <h3 class="span-2 fiscal-form-title">Serviço e ISS</h3>
-              <label>Código nacional do serviço (cTribNac)<input name="serviceCode" inputmode="numeric" maxlength="6" required /></label>
+              <label class="span-2">Serviço prestado (código nacional)<select id="fiscal-service-preset">
+                <option value="">Escolha com o contador</option>
+                <option value="170601">17.06.01 — Propaganda e publicidade, inclusive promoção de vendas</option>
+                <option value="172501">17.25.01 — Inserção de textos, desenhos e materiais de propaganda em qualquer meio (internet)</option>
+                <option value="100501">10.05.01 — Agenciamento, corretagem ou intermediação de bens móveis</option>
+                <option value="100901">10.09.01 — Representação de qualquer natureza, inclusive comercial</option>
+                <option value="other">Outro código…</option>
+              </select><input type="hidden" name="serviceCode" /><small class="fiscal-field-hint">A escolha depende do seu contrato e da atividade no CNPJ. O contador confirma qual vale para você.</small></label>
+              <label class="hidden" id="fiscal-service-other-wrap">Outro código nacional (6 dígitos)<input id="fiscal-service-other" inputmode="numeric" maxlength="6" /></label>
               <label>Código municipal complementar<input name="municipalServiceCode" maxlength="20" /></label>
               <label>Código NBS<input name="nbsCode" inputmode="numeric" maxlength="9" placeholder="Confirmar com o contador" /></label>
               <label>Série DPS<input name="series" inputmode="numeric" maxlength="5" value="49999" required /></label>
@@ -1409,7 +1418,7 @@
     </div>
   </div>
 
-  <script src="/fiscal.js?v=2"></script>
+  <script src="/fiscal.js?v=3"></script>
   <script src="/app.js?v=fiscal-1"></script>
 </body>
 </html>

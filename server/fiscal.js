@@ -485,9 +485,9 @@ function validPct(value) {
 function validateProfile(profile, { production = false } = {}) {
   const issues = [];
   if (!profile.legalName) issues.push("Informe a razão social da sua empresa de afiliado.");
-  if (!validDocument(profile.cnpj) || onlyDigits(profile.cnpj).length !== 14) issues.push("Informe um CNPJ válido.");
-  if (!/^\d{7}$/.test(onlyDigits(profile.municipalityCode))) issues.push("Informe o código IBGE do município da sua empresa de afiliado.");
-  if (!/^\d{6}$/.test(onlyDigits(profile.serviceCode))) issues.push("Informe o código nacional do serviço com 6 dígitos.");
+  if (!validDocument(profile.cnpj) || onlyDigits(profile.cnpj).length !== 14) issues.push("Informe um CNPJ válido (use o botão Buscar dados para preencher o resto).");
+  if (!/^\d{7}$/.test(onlyDigits(profile.municipalityCode))) issues.push("Escolha a UF e o município da sua empresa de afiliado.");
+  if (!/^\d{6}$/.test(onlyDigits(profile.serviceCode))) issues.push("Escolha o serviço prestado (código nacional).");
   if (profile.nbsCode && !/^\d{9}$/.test(onlyDigits(profile.nbsCode))) issues.push("O código NBS deve ter 9 dígitos.");
   if (!TAX_REGIMES[profile.taxRegime]) issues.push("Escolha o regime tributário: MEI, Simples Nacional (ME/EPP), Lucro Presumido, Lucro Real ou outro não optante.");
   const simpleOption = simpleOptionFor(profile.taxRegime);
@@ -508,7 +508,7 @@ function validateProfile(profile, { production = false } = {}) {
   if (["pisRate", "cofinsRate", "irrfRetentionPct", "csllRetentionPct", "cpRetentionPct"].some((key) => !validPct(profile[key]))) issues.push("Os percentuais de PIS, COFINS e retenções devem ficar entre 0 e 100%.");
   if ((profile.pisRate || profile.cofinsRate) && !profile.pisCofinsCst) issues.push("Informe o CST de PIS/COFINS para usar as alíquotas.");
   if (profile.pisCofinsRetention !== "" && profile.pisCofinsRetention != null && !/^[0-9]$/.test(String(profile.pisCofinsRetention))) issues.push("Informe um tipo de retenção de PIS/COFINS válido.");
-  if (!["last_day", "per_import"].includes(profile.competenceRule)) issues.push("Defina com o contador como a data de competência será informada (último dia do mês ou data informada na importação).");
+  if (!["last_day", "per_import"].includes(profile.competenceRule)) issues.push("Escolha a data de competência: último dia do mês ou data informada na importação.");
   if (!profile.descriptionTemplate) issues.push("Informe a descrição do serviço.");
   if (!/^[1-9]\d{0,4}$/.test(String(profile.series || "")) || Number(profile.series) > 49999) issues.push("Informe uma série DPS entre 1 e 49999.");
   if (production && !profile.accountantConfirmed) issues.push("A configuração precisa ser confirmada pelo contador.");
@@ -520,7 +520,7 @@ function validateProfile(profile, { production = false } = {}) {
   if (production && profile.ibscbsStatus !== "not_applicable") {
     issues.push(profile.ibscbsStatus === "configured"
       ? "O caso exige campos IBS/CBS adicionais e permanece bloqueado nesta versão."
-      : "Defina com o contador o tratamento de IBS/CBS antes de emitir.");
+      : "Escolha o tratamento de IBS/CBS definido com o contador.");
   }
   return issues;
 }
@@ -819,8 +819,10 @@ async function getState(options = {}, userId = requireUserId()) {
   const total = Number(draftsResult.count || 0);
   return {
     profile,
-    profileIssues: validateProfile(profile || {}),
-    productionIssues: validateProfile(profile || {}, { production: true }),
+    // Sem cadastro salvo, confere sobre os mesmos padrões que a tela já mostra
+    // selecionados, para listar só o que realmente falta escolher ou digitar.
+    profileIssues: [...(profile ? [] : ["Preencha e salve os seus dados de afiliado."]), ...validateProfile(profile || publicProfile({}))],
+    productionIssues: [...(profile ? [] : ["Preencha e salve os seus dados de afiliado."]), ...validateProfile(profile || publicProfile({}), { production: true })],
     productionEnabled: process.env.FISCAL_PRODUCTION_ENABLED === "1",
     restrictedEnabled: process.env.FISCAL_RESTRICTED_ENABLED === "1",
     layoutVersion: process.env.FISCAL_LAYOUT_VERSION || "1.01",
@@ -1625,6 +1627,37 @@ async function exportCompetence(competence, userId = requireUserId()) {
   return `﻿${header.join(";")}\n${lines.join("\n")}\n`;
 }
 
+// Dados públicos do CNPJ (Receita Federal via BrasilAPI) para preencher o
+// cadastro do afiliado: razão social, município IBGE e opção MEI/Simples.
+function lookupCompany(cnpj) {
+  if (!validDocument(cnpj) || cnpj.length !== 14) throw fiscalError("CNPJ inválido.", "INVALID_CNPJ");
+  return new Promise((resolve, reject) => {
+    const request = https.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { headers: { Accept: "application/json", "User-Agent": "Shoplytics-NFSe/1.0" }, timeout: 15000 }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => {
+        let json = null;
+        try { json = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (_) { /* resposta inválida */ }
+        if (response.statusCode === 404) return reject(fiscalError("CNPJ não encontrado na Receita Federal.", "CNPJ_NOT_FOUND", 404));
+        if (response.statusCode !== 200 || !json) return reject(fiscalError("A consulta do CNPJ não respondeu. Preencha os dados manualmente.", "CNPJ_LOOKUP_FAILED", 503));
+        const taxRegime = json.opcao_pelo_mei ? "MEI" : (json.opcao_pelo_simples ? "Simples Nacional" : "");
+        resolve({
+          legalName: String(json.razao_social || "").trim(),
+          tradeName: String(json.nome_fantasia || "").trim(),
+          municipalityCode: /^\d{7}$/.test(String(json.codigo_municipio_ibge || "")) ? String(json.codigo_municipio_ibge) : "",
+          city: json.municipio || "",
+          state: json.uf || "",
+          taxRegime,
+          status: json.descricao_situacao_cadastral || "",
+          mainActivity: json.cnae_fiscal_descricao || "",
+        });
+      });
+    });
+    request.on("timeout", () => request.destroy(fiscalError("A consulta do CNPJ demorou demais. Tente de novo.", "CNPJ_LOOKUP_FAILED", 503)));
+    request.on("error", (err) => reject(err.status ? err : fiscalError("A consulta do CNPJ falhou. Preencha os dados manualmente.", "CNPJ_LOOKUP_FAILED", 503)));
+  });
+}
+
 async function handleFiscalRoute({ pathname, req, res, readBody, sendJson, sendText }) {
   if (!pathname.startsWith("/api/fiscal")) return false;
   try {
@@ -1653,6 +1686,11 @@ async function handleFiscalRoute({ pathname, req, res, readBody, sendJson, sendT
       const profile = await getProfile();
       const identity = readCertificate(body, profile?.cnpj || "");
       sendJson(res, 200, { success: true, certificate: identity.info });
+      return true;
+    }
+    const cnpjMatch = pathname.match(/^\/api\/fiscal\/cnpj\/(\d{14})$/);
+    if (cnpjMatch && req.method === "GET") {
+      sendJson(res, 200, { success: true, company: await lookupCompany(cnpjMatch[1]) });
       return true;
     }
     if (pathname === "/api/fiscal/municipality/check" && req.method === "POST") {

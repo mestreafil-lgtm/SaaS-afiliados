@@ -57,3 +57,6 @@ html.dark .fiscal-toolbar input,html.dark .fiscal-toolbar select,html.dark .fisc
 @media(max-width:900px){.fiscal-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.fiscal-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.fiscal-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fiscal-toolbar{grid-template-columns:1fr}}
 .fiscal-form .hidden,.fiscal-edit-form .hidden,.fiscal-view .hidden { display:none!important; }
+.fiscal-input-action { display:flex; gap:8px; }.fiscal-input-action input { flex:1; min-width:0; }.fiscal-input-action .fiscal-btn { white-space:nowrap; min-height:40px; }
+.fiscal-field-hint { color:#64748b; font-size:10.5px; font-weight:500; line-height:1.4; }.fiscal-field-hint.is-error { color:#b91c1c; }.fiscal-field-hint.is-ok { color:#047857; }
+.fiscal-form select:disabled { background:#f8fafc; color:#94a3b8; }

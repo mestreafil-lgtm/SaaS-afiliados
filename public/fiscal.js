@@ -106,6 +106,92 @@
       else input.value = value ?? "";
     }
     syncProfileVisibility();
+    setServiceCode(profile.serviceCode || "");
+    setMunicipality(profile.municipalityCode || "");
+  }
+
+  // Município por UF e cidade (lista oficial do IBGE servida como JSON estático).
+  let municipalitiesPromise = null;
+  function municipalities() {
+    municipalitiesPromise ||= fetch("/fiscal-municipios.json").then((res) => {
+      if (!res.ok) throw new Error("Não foi possível carregar a lista de municípios.");
+      return res.json();
+    }).catch((err) => { municipalitiesPromise = null; throw err; });
+    return municipalitiesPromise;
+  }
+
+  let ufOptionsPromise = null;
+  function fillUfOptions() {
+    ufOptionsPromise ||= municipalities().then((data) => {
+      const select = $("#fiscal-uf");
+      if (select && select.options.length <= 1) select.insertAdjacentHTML("beforeend", Object.keys(data).sort().map((uf) => `<option value="${uf}">${uf}</option>`).join(""));
+    }).catch((err) => { ufOptionsPromise = null; throw err; });
+    return ufOptionsPromise;
+  }
+
+  async function fillCityOptions(uf, selectedCode = "") {
+    const select = $("#fiscal-city");
+    if (!select) return;
+    const data = await municipalities();
+    const cities = data[uf] || [];
+    select.disabled = !cities.length;
+    select.innerHTML = cities.length
+      ? `<option value="">Escolha o município</option>${cities.map(([code, name]) => `<option value="${code}" ${code === selectedCode ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}`
+      : '<option value="">Escolha a UF primeiro</option>';
+    updateCityCode();
+  }
+
+  function updateCityCode() {
+    const form = $("#fiscal-profile-form");
+    const code = $("#fiscal-city")?.value || "";
+    if (form) form.elements.municipalityCode.value = code;
+    const hint = $("#fiscal-city-code");
+    if (hint) hint.textContent = code ? `Código IBGE: ${code}` : "";
+  }
+
+  async function setMunicipality(code) {
+    try {
+      await fillUfOptions();
+      const data = await municipalities();
+      const uf = Object.keys(data).find((key) => data[key].some(([item]) => item === code)) || "";
+      $("#fiscal-uf").value = uf;
+      await fillCityOptions(uf, code);
+    } catch (err) { setStatus($("#fiscal-profile-status"), err.message, "error"); }
+  }
+
+  function setServiceCode(code) {
+    const preset = $("#fiscal-service-preset");
+    const form = $("#fiscal-profile-form");
+    if (!preset || !form) return;
+    const known = [...preset.options].some((option) => option.value === code && code);
+    preset.value = known ? code : (code ? "other" : "");
+    $("#fiscal-service-other").value = known ? "" : code;
+    syncServiceCode();
+  }
+
+  function syncServiceCode() {
+    const preset = $("#fiscal-service-preset");
+    const form = $("#fiscal-profile-form");
+    const other = preset.value === "other";
+    $("#fiscal-service-other-wrap")?.classList.toggle("hidden", !other);
+    form.elements.serviceCode.value = other ? ($("#fiscal-service-other").value || "").replace(/\D/g, "") : preset.value;
+  }
+
+  async function lookupCnpj() {
+    const form = $("#fiscal-profile-form");
+    const status = $("#fiscal-cnpj-status");
+    const cnpj = String(form.elements.cnpj.value || "").replace(/\D/g, "");
+    if (cnpj.length !== 14) return setStatus(status, "Digite os 14 números do CNPJ.", "error");
+    setStatus(status, "Buscando dados do CNPJ…");
+    try {
+      const { company } = await api(`/api/fiscal/cnpj/${cnpj}`);
+      if (company.legalName) form.elements.legalName.value = company.legalName;
+      if (company.tradeName && !form.elements.tradeName.value) form.elements.tradeName.value = company.tradeName;
+      if (company.municipalityCode) await setMunicipality(company.municipalityCode);
+      if (company.taxRegime) { form.elements.taxRegime.value = company.taxRegime; syncProfileVisibility(); }
+      form.elements.accountantConfirmed.checked = false;
+      setStatus(status, `${company.legalName || "Empresa encontrada"}${company.city ? ` · ${company.city}/${company.state}` : ""}${company.taxRegime ? ` · ${company.taxRegime}` : " · regime não informado na Receita, escolha abaixo"}. Confira e salve.`, "ok");
+    } catch (err) { setStatus(status, err.message, "error"); }
   }
 
   function renderProfile() {
@@ -455,6 +541,7 @@
   async function saveProfile(event) {
     event.preventDefault();
     const form = event.currentTarget;
+    syncServiceCode();
     const raw = Object.fromEntries(new FormData(form));
     raw.accountantConfirmed = form.elements.accountantConfirmed.checked;
     setStatus($("#fiscal-profile-status"), "Salvando…");
@@ -504,6 +591,12 @@
         setStatus($("#fiscal-profile-status"), "A configuração mudou: confirme de novo com o contador antes de salvar.");
       }
     });
+    $("#fiscal-cnpj-lookup")?.addEventListener("click", lookupCnpj);
+    $("#fiscal-uf")?.addEventListener("change", (event) => fillCityOptions(event.target.value));
+    $("#fiscal-city")?.addEventListener("change", updateCityCode);
+    $("#fiscal-service-preset")?.addEventListener("change", syncServiceCode);
+    $("#fiscal-service-other")?.addEventListener("input", syncServiceCode);
+    $('[data-fiscal-tab="settings"]')?.addEventListener("click", () => fillUfOptions().catch(() => {}));
     $("#fiscal-cert-test")?.addEventListener("click", testCertificate);
     $("#fiscal-municipality-check")?.addEventListener("click", checkMunicipality);
     $("#fiscal-edit-form")?.addEventListener("submit", saveEdit);
