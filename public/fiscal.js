@@ -203,12 +203,6 @@
       chip.textContent = issues.length ? `${issues.length} pendência${issues.length > 1 ? "s" : ""}` : "Cadastro válido";
       chip.classList.toggle("is-ok", !issues.length);
     }
-    const list = $("#fiscal-production-issues");
-    if (list) {
-      const all = data.productionIssues || [];
-      list.innerHTML = all.length ? `<li><strong>Antes de emitir em produção:</strong></li>${all.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}` : "";
-      list.classList.toggle("hidden", !all.length);
-    }
     const check = data.profile?.municipalCheck;
     if (check) setStatus($("#fiscal-municipality-status"), `Última consulta (${check.environment === "production" ? "produção" : "produção restrita"}): ${new Date(check.checkedAt).toLocaleString("pt-BR")} · ${check.ok ? "município respondeu" : "consulta sem confirmação"}.`, check.ok ? "ok" : "error");
     const production = $("#fiscal-production-chip");
