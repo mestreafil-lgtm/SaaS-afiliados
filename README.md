@@ -48,6 +48,29 @@ styles/       fonte do Tailwind
 - **Nunca** commite o `.env` (já está no `.gitignore`).
 - Use `service_role` só no backend.
 
+## NFS-e para afiliados Shopee
+
+O painel possui um módulo fiscal multiusuário em **Notas fiscais**. Ele importa o
+relatório fiscal CSV/XLSX da Shopee, agrupa por tomador e competência, valida
+pendências, prepara/aprova a DPS, confere certificado A1 e preserva o XML
+autorizado.
+
+A importação do relatório fiscal é obrigatória porque a API de afiliados não entrega CNPJ,
+razão social e endereço fiscal do vendedor, necessários para preencher a NFS-e.
+
+O valor da nota é a comissão pelo serviço de afiliação, não o total vendido na
+Shopee. Antes do primeiro uso, execute `npm run setup:db` e mantenha
+`FISCAL_PRODUCTION_ENABLED=0`. A transmissão real só deve ser habilitada após:
+
+- revisão do código de serviço, NBS, município, ISS e IBS/CBS pelo contador;
+- homologação do leiaute 1.01 usado pelo emitente;
+- teste do certificado A1 pertencente ao CNPJ cadastrado;
+- validação do fluxo em ambiente de produção restrita.
+
+Certificado e senha são recebidos apenas na requisição de validação/emissão e
+não são gravados no banco. Resultado inconclusivo nunca é reenviado
+automaticamente; a DPS fica bloqueada para conciliação.
+
 ## Deploy
 
 - **Railway:** veja [`DEPLOY.md`](DEPLOY.md) e [`railway.env.example`](railway.env.example)

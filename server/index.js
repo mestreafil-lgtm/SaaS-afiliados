@@ -88,6 +88,7 @@ const {
   ADMIN_EMAIL,
 } = require("./profiles");
 const { clampDashRange, shopeeEndDate } = require("./brtDates");
+const { handleFiscalRoute } = require("./fiscal");
 
 const PORT = Number(process.env.PORT || 3790);
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -474,6 +475,12 @@ async function requestHandler(req, res) {
       await runWithUser(user, async () => {
         if (pathname === "/api/auth/me" && req.method === "GET") {
           sendJson(res, 200, { success: true, user: getUser() });
+          return;
+        }
+
+        if (pathname.startsWith("/api/fiscal")) {
+          await requireApprovedUser();
+          await handleFiscalRoute({ pathname, req, res, readBody, sendJson, sendText });
           return;
         }
 
