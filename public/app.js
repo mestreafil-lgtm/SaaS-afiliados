@@ -803,6 +803,7 @@
     canais: "Canais e status",
     config: "Configurações",
     produtos: "Backup",
+    fiscal: "Notas fiscais",
     supercomissoes: "Radar de Supercomissões",
     campanhas: "Campanhas",
     pedidos: "Pedidos",
@@ -1333,6 +1334,7 @@
     $("#view-analise-ia")?.classList.toggle("hidden", view !== "analise-ia");
     $("#view-canais")?.classList.toggle("hidden", view !== "canais");
     $("#view-config").classList.toggle("hidden", view !== "config");
+    $("#view-fiscal")?.classList.toggle("hidden", view !== "fiscal");
     $("#view-data").classList.toggle("hidden", !isData);
     const label = VIEW_LABELS[state.navKey] || VIEW_LABELS[navKey] || VIEW_LABELS[view] || view;
     $("#crumb-label").textContent = label;
@@ -1360,6 +1362,7 @@
       setCfgTab(navKey === "integracoes" ? "conexoes" : state.cfgTab || "conexoes");
       if (state.cfgTab === "indefinidos") renderIndefinidos();
     }
+    if (view === "fiscal") window.FiscalModule?.load();
     if (isData) loadDataView(view);
   }
 

@@ -37,6 +37,22 @@ Após `npm run seed:demo` (local) ou seed no ambiente:
 
 Opcionais: `VAPID_*` (push), `CLAUDE_API_KEY` (fallback), Pinterest.
 
+### Emissão fiscal
+
+| Variável | Uso |
+|---|---|
+| `FISCAL_PRODUCTION_ENABLED` | Use `0` até concluir homologação e revisão fiscal |
+| `FISCAL_LAYOUT_VERSION` | Leiaute autorizado pelo conector; atualmente `1.01` |
+| `FISCAL_RESTRICTED_ENABLED` | `1` libera a produção restrita (testes na Sefin Nacional com certificado real) |
+| `FISCAL_ICP_ROOTS_PEM` | Raízes ICP-Brasil (PEM ou caminho). Sem ela a cadeia do certificado não é conferida e a emissão em produção fica bloqueada |
+| `FISCAL_XSD_PATH` | Opcional: zip do pacote XSD oficial; sem ele o servidor baixa do gov.br |
+| `FISCAL_PARAMS_SERVICE` / `FISCAL_PARAMS_PREFIX` | Opcional: caminho da consulta de parâmetros municipais, se o padrão não responder |
+
+Rode `npm run setup:db` para criar `fiscal_profiles`, `fiscal_imports`,
+`fiscal_drafts` e `fiscal_events` (auditoria). Não habilite produção apenas por ter configurado as variáveis:
+o cadastro de cada emitente, o tratamento de IBS/CBS e o certificado A1 também
+precisam passar nas validações do módulo.
+
 **Não** crie `PORT` — o Railway injeta sozinho.
 
 Lista completa para colar: [`railway.env.example`](railway.env.example).

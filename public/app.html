@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="/tailwind.css" />
   <link rel="stylesheet" href="/gemini-app.css?v=bonus-2" />
+  <link rel="stylesheet" href="/fiscal.css?v=2" />
 </head>
 <body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen antialiased selection:bg-brand-500 selection:text-white font-sans transition-colors duration-200">
 
@@ -157,6 +158,9 @@
               </button>
               <button type="button" class="nav-item" data-view="produtos">
                 <span class="nav-left"><img class="nav-logo is-square" src="/assets/produtos.png" alt="" /><span class="nav-label">Backup</span></span>
+              </button>
+              <button type="button" class="nav-item" data-view="fiscal">
+                <span class="nav-left"><img class="nav-logo is-square" src="/assets/imposto.png" alt="" /><span class="nav-label">Notas fiscais</span></span>
               </button>
             </div>
           </div>
@@ -917,6 +921,184 @@
           </div>
         </section>
 
+        <!-- EMISSÃO FISCAL NFS-e -->
+        <section id="view-fiscal" class="view hidden fiscal-view space-y-5">
+          <div class="fiscal-hero">
+            <div>
+              <span class="fiscal-eyebrow">NFS-e · Afiliados Shopee</span>
+              <h1>Notas fiscais do afiliado</h1>
+              <p>Você, afiliado Shopee, emite a NFS-e da comissão que recebeu. Importe o relatório fiscal de afiliado, corrija pendências e aprove antes de emitir.</p>
+            </div>
+            <div id="fiscal-production-chip" class="fiscal-chip is-safe"><i class="fa-solid fa-lock"></i> Emissão real bloqueada</div>
+          </div>
+
+          <div class="fiscal-warning" role="note">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            <div><strong>Quem emite é você, afiliado.</strong><span>A nota é do seu serviço de divulgação. O valor é só a sua comissão, nunca o total vendido, e cada nota vai para a loja que pagou essa comissão no relatório fiscal da Shopee. A transmissão só é liberada depois de validar o seu cadastro e o seu certificado A1.</span></div>
+          </div>
+
+          <div class="fiscal-kpis" id="fiscal-kpis">
+            <article><span>Prontas para conferir</span><strong data-fiscal-kpi="ready">0</strong></article>
+            <article><span>Com pendências</span><strong data-fiscal-kpi="pending">0</strong></article>
+            <article><span>Aprovadas</span><strong data-fiscal-kpi="approved">0</strong></article>
+            <article><span>Autorizadas</span><strong data-fiscal-kpi="authorized">0</strong></article>
+            <article><span>Em conciliação</span><strong data-fiscal-kpi="uncertain">0</strong></article>
+          </div>
+
+          <div class="fiscal-tabs" role="tablist" aria-label="Emissão fiscal">
+            <button type="button" class="is-active" data-fiscal-tab="notes">Notas</button>
+            <button type="button" data-fiscal-tab="import">Importar relatório</button>
+            <button type="button" data-fiscal-tab="settings">Configuração fiscal</button>
+          </div>
+
+          <div class="fiscal-panel" data-fiscal-panel="notes">
+            <div class="fiscal-panel-head">
+              <div><h2>Prévia das notas</h2><p>Cada linha é uma nota sua: a comissão recebida de uma loja em um mês.</p></div>
+              <button type="button" class="fiscal-btn secondary" id="fiscal-refresh"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+            </div>
+            <div class="fiscal-toolbar">
+              <label>Situação<select id="fiscal-filter-status"><option value="">Todas</option><option value="pending">Com pendência</option><option value="ready">Prontas</option><option value="approved">Aprovadas</option><option value="uncertain">Em conciliação</option><option value="rejected">Rejeitadas</option><option value="homologated">Homologadas (teste)</option><option value="authorized">Autorizadas</option><option value="cancelled">Canceladas</option></select></label>
+              <label>Competência<input id="fiscal-filter-competence" type="month" /></label>
+              <label>Documento<input id="fiscal-filter-search" placeholder="CPF, CNPJ ou NIF" maxlength="40" /></label>
+              <label>Ambiente de transmissão<select id="fiscal-environment"><option value="restricted">Produção restrita (teste)</option><option value="production">Produção (nota real)</option></select></label>
+            </div>
+            <div class="fiscal-actions fiscal-batch">
+              <button type="button" class="fiscal-btn secondary" id="fiscal-approve-batch"><i class="fa-solid fa-check-double"></i> Aprovar prontas</button>
+              <button type="button" class="fiscal-btn secondary" id="fiscal-emit-batch"><i class="fa-solid fa-paper-plane"></i> Transmitir aprovadas (até 20)</button>
+              <button type="button" class="fiscal-btn secondary" id="fiscal-export"><i class="fa-solid fa-file-csv"></i> Exportar mês para o contador</button>
+            </div>
+            <p class="fiscal-status" id="fiscal-notes-status"></p>
+            <div id="fiscal-notes-empty" class="fiscal-empty">
+              <i class="fa-regular fa-file-lines"></i><strong>Nenhuma prévia fiscal</strong><span>Importe o relatório fiscal da Shopee para começar.</span>
+            </div>
+            <div class="fiscal-table-wrap hidden" id="fiscal-notes-wrap">
+              <table class="fiscal-table">
+                <thead><tr><th>Loja que pagou a comissão</th><th>Competência</th><th>Valor</th><th>Situação</th><th></th></tr></thead>
+                <tbody id="fiscal-notes-body"></tbody>
+              </table>
+            </div>
+            <div class="fiscal-pagination hidden" id="fiscal-pagination">
+              <button type="button" class="fiscal-btn secondary" id="fiscal-page-prev">Anterior</button>
+              <span id="fiscal-page-label"></span>
+              <button type="button" class="fiscal-btn secondary" id="fiscal-page-next">Próxima</button>
+            </div>
+          </div>
+
+          <div class="fiscal-panel hidden" data-fiscal-panel="import">
+            <div class="fiscal-panel-head"><div><h2>Importar relatório fiscal de afiliado</h2><p>Use o CSV que a Shopee disponibiliza para afiliados, com os dados de cada loja e a comissão que você recebeu dela.</p></div></div>
+            <div class="fiscal-upload" id="fiscal-dropzone">
+              <input type="file" id="fiscal-file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <strong>Escolha o seu relatório de comissões de afiliado</strong>
+              <span>CSV da Shopee ou XLSX. As comissões são agrupadas por loja e mês.</span>
+              <button type="button" class="fiscal-btn secondary" id="fiscal-pick-file">Selecionar arquivo</button>
+              <em id="fiscal-file-name">Nenhum arquivo selecionado</em>
+            </div>
+            <label class="fiscal-inline-field">Data da prestação do serviço (opcional)<input type="date" id="fiscal-service-date" /><small>O relatório só traz o mês. Informe a data do fato gerador definida com o contador; sem ela, vale a regra de competência da configuração fiscal.</small></label>
+            <div id="fiscal-mapping" class="fiscal-mapping hidden"></div>
+            <div id="fiscal-preview" class="fiscal-preview hidden"></div>
+            <div class="fiscal-actions">
+              <button type="button" class="fiscal-btn secondary" id="fiscal-preview-btn" disabled>Conferir arquivo</button>
+              <button type="button" class="fiscal-btn primary" id="fiscal-import-btn" disabled>Importar e criar prévias</button>
+            </div>
+            <p class="fiscal-status" id="fiscal-import-status"></p>
+          </div>
+
+          <div class="fiscal-panel hidden" data-fiscal-panel="settings">
+            <div class="fiscal-panel-head"><div><h2>Seus dados de afiliado</h2><p>Dados da sua empresa (o CNPJ do afiliado), que emite as notas. Revise tudo com o seu contador.</p></div><span class="fiscal-chip" id="fiscal-profile-chip">Cadastro incompleto</span></div>
+            <ul class="fiscal-issues hidden" id="fiscal-production-issues"></ul>
+            <form id="fiscal-profile-form" class="fiscal-form">
+              <h3 class="span-2 fiscal-form-title">Sua empresa (afiliado)</h3>
+              <label class="span-2">Razão social<input name="legalName" maxlength="180" required /></label>
+              <label>Nome fantasia<input name="tradeName" maxlength="180" /></label>
+              <label>CNPJ<input name="cnpj" inputmode="numeric" maxlength="18" required /></label>
+              <label>Inscrição municipal<input name="municipalRegistration" maxlength="40" /></label>
+              <label>Código IBGE do município<input name="municipalityCode" inputmode="numeric" maxlength="7" required /></label>
+
+              <h3 class="span-2 fiscal-form-title">Regime tributário</h3>
+              <label>Regime da sua empresa<select name="taxRegime"><option value="MEI">MEI</option><option value="Simples Nacional">Simples Nacional (ME/EPP)</option><option value="Lucro Presumido">Lucro Presumido</option><option value="Lucro Real">Lucro Real</option><option value="Outro não optante">Outro (não optante do Simples)</option></select></label>
+              <label data-fiscal-only="simples">Apuração no Simples<select name="simpleAssessmentRegime"><option value="1">Tributos federais e ISS pelo Simples</option><option value="2">Federais pelo Simples, ISS fora do Simples</option><option value="3">Federais e ISS fora do Simples</option></select></label>
+              <label>Regime especial<select name="specialTaxRegime"><option value="0">Nenhum</option><option value="1">Ato cooperado</option><option value="2">Estimativa</option><option value="3">Microempresa municipal</option><option value="4">Notário ou registrador</option><option value="5">Profissional autônomo</option><option value="6">Sociedade de profissionais</option><option value="9">Outros</option></select></label>
+
+              <h3 class="span-2 fiscal-form-title">Serviço e ISS</h3>
+              <label>Código nacional do serviço (cTribNac)<input name="serviceCode" inputmode="numeric" maxlength="6" required /></label>
+              <label>Código municipal complementar<input name="municipalServiceCode" maxlength="20" /></label>
+              <label>Código NBS<input name="nbsCode" inputmode="numeric" maxlength="9" placeholder="Confirmar com o contador" /></label>
+              <label>Série DPS<input name="series" inputmode="numeric" maxlength="5" value="49999" required /></label>
+              <label>Tributação do ISS<select name="issTaxation"><option value="1">Operação tributável</option><option value="2">Imunidade</option><option value="3">Exportação de serviço</option><option value="4">Não incidência</option></select></label>
+              <label>Retenção do ISS<select name="issRetention"><option value="1">Não retido</option><option value="2">Retido pelo tomador</option><option value="3">Retido pelo intermediário</option></select></label>
+              <label>Alíquota do ISS (%) — só quando o município exige<input name="issRate" inputmode="decimal" /></label>
+              <label>Data de competência<select name="competenceRule"><option value="">Escolha com o contador</option><option value="last_day">Último dia do mês do relatório</option><option value="per_import">Data informada em cada importação</option></select></label>
+
+              <h3 class="span-2 fiscal-form-title">Tributos aproximados e federais</h3>
+              <label>Tributos aproximados<select name="totalsMode"><option value="not_informed">Não informar (Decreto 8.264/2014)</option><option value="simple_rate" data-fiscal-only="simples">Percentual do Simples Nacional</option><option value="percent">Percentuais federal, estadual e municipal</option></select></label>
+              <label data-fiscal-totals="simple_rate">Percentual do Simples (%)<input name="approximateTaxPct" inputmode="decimal" /></label>
+              <label data-fiscal-totals="percent">Federal (%)<input name="approximateFederalPct" inputmode="decimal" /></label>
+              <label data-fiscal-totals="percent">Estadual (%)<input name="approximateStatePct" inputmode="decimal" /></label>
+              <label data-fiscal-totals="percent">Municipal (%)<input name="approximateMunicipalPct" inputmode="decimal" /></label>
+              <label data-fiscal-only="nao-optante">CST de PIS/COFINS<input name="pisCofinsCst" inputmode="numeric" maxlength="2" placeholder="Ex.: 01" /></label>
+              <label data-fiscal-only="nao-optante">Alíquota PIS (%)<input name="pisRate" inputmode="decimal" /></label>
+              <label data-fiscal-only="nao-optante">Alíquota COFINS (%)<input name="cofinsRate" inputmode="decimal" /></label>
+              <label data-fiscal-only="nao-optante">Tipo de retenção PIS/COFINS<input name="pisCofinsRetention" inputmode="numeric" maxlength="1" placeholder="Código do leiaute" /></label>
+              <label>Retenção IRRF (%)<input name="irrfRetentionPct" inputmode="decimal" /></label>
+              <label>Retenção CSLL (%)<input name="csllRetentionPct" inputmode="decimal" /></label>
+              <label>Retenção INSS/CP (%)<input name="cpRetentionPct" inputmode="decimal" /></label>
+              <label>Tratamento IBS/CBS<select name="ibscbsStatus"><option value="pending">Pendente de validação</option><option value="not_applicable">Não aplicável, confirmado</option><option value="configured">Exige campos adicionais</option></select></label>
+
+              <h3 class="span-2 fiscal-form-title">Comissões de lojas do exterior</h3>
+              <p class="span-2 fiscal-hint">Para comissões pagas por lojas de fora do Brasil (ex.: China e Coreia). Valem para todas; cada nota pode ser ajustada. Use os códigos das tabelas do leiaute NFS-e.</p>
+              <label>Tributação do ISS no exterior<select name="foreignIssTaxation"><option value="">Escolha com o contador</option><option value="3">Exportação de serviço</option><option value="1">Operação tributável</option></select></label>
+              <label>Moeda do contrato (código BACEN)<input name="foreignCurrency" inputmode="numeric" maxlength="3" placeholder="790 = real" /></label>
+              <label>Modo de prestação (0–4)<input name="foreignServiceMode" inputmode="numeric" maxlength="1" /></label>
+              <label>Vínculo entre as partes (0–6, 9)<input name="foreignRelationship" inputmode="numeric" maxlength="1" /></label>
+              <label>Apoio ao prestador (00–08)<input name="foreignSupportProvider" inputmode="numeric" maxlength="2" /></label>
+              <label>Apoio ao tomador (00–…)<input name="foreignSupportRecipient" inputmode="numeric" maxlength="2" /></label>
+              <label>Movimentação temporária de bens (0–3)<input name="foreignTemporaryGoods" inputmode="numeric" maxlength="1" /></label>
+              <label>Compartilhar com MDIC (0 ou 1)<input name="foreignShareMdic" inputmode="numeric" maxlength="1" /></label>
+
+              <label class="span-2">Descrição do serviço<textarea name="descriptionTemplate" rows="3" maxlength="1000">Serviços de divulgação de produtos como afiliado Shopee, referentes a {mes}/{ano}.</textarea></label>
+              <label class="fiscal-check span-2"><input type="checkbox" name="accountantConfirmed" /><span>Confirmo que códigos, regime, tributação, competência, município e IBS/CBS foram revisados com o contador. Alterar a configuração exige nova confirmação.</span></label>
+              <div class="span-2 fiscal-actions"><button type="submit" class="fiscal-btn primary">Salvar configuração</button></div>
+              <p class="span-2 fiscal-status" id="fiscal-profile-status"></p>
+            </form>
+
+            <div class="fiscal-cert">
+              <div><h3>Certificado digital A1</h3><p>O certificado da sua empresa de afiliado. O PFX/P12 e a senha são usados somente na requisição e não ficam armazenados. Ele também é usado para consultar o município e transmitir notas.</p></div>
+              <div class="fiscal-cert-fields"><input type="file" id="fiscal-cert-file" accept=".pfx,.p12" /><input type="password" id="fiscal-cert-password" placeholder="Senha do certificado" autocomplete="off" /><button type="button" class="fiscal-btn secondary" id="fiscal-cert-test">Validar certificado</button></div>
+              <p class="fiscal-status" id="fiscal-cert-status"></p>
+              <div class="fiscal-cert-fields"><select id="fiscal-municipality-env"><option value="restricted">Produção restrita</option><option value="production">Produção</option></select><button type="button" class="fiscal-btn secondary" id="fiscal-municipality-check">Consultar parâmetros do município</button></div>
+              <p class="fiscal-status" id="fiscal-municipality-status"></p>
+            </div>
+          </div>
+
+          <dialog id="fiscal-edit-dialog" class="fiscal-dialog">
+            <form method="dialog" id="fiscal-edit-form" class="fiscal-edit-form">
+              <div class="fiscal-dialog-head"><div><h2>Corrigir dados da loja</h2><p>Complete as pendências antes de aprovar.</p></div><button type="button" id="fiscal-edit-x" aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button></div>
+              <input type="hidden" name="draftId" />
+              <label class="span-2">Nome / razão social<input name="name" required /></label>
+              <label>País (ISO2)<input name="country" maxlength="2" placeholder="BR" /></label>
+              <label>CPF/CNPJ ou NIF<input name="document" required /></label>
+              <label>E-mail<input name="email" type="email" /></label>
+              <label>Competência<input name="competence" placeholder="AAAA-MM" required /></label>
+              <label>Data da prestação<input name="serviceDate" type="date" /></label>
+              <label>Valor (R$)<input name="amount" inputmode="decimal" required /></label>
+              <label class="span-2">Logradouro<input name="street" required /></label>
+              <label>Número<input name="number" required /></label>
+              <label>Bairro / distrito<input name="district" required /></label>
+              <label>Cidade<input name="city" required /></label>
+              <label data-fiscal-edit="br">CEP<input name="zip" /></label>
+              <label data-fiscal-edit="br">UF<input name="state" maxlength="2" /></label>
+              <label data-fiscal-edit="br">Código IBGE da cidade<input name="municipalityCode" maxlength="7" /></label>
+              <label data-fiscal-edit="foreign">Código postal<input name="postalCode" maxlength="11" /></label>
+              <label data-fiscal-edit="foreign">Estado / província<input name="stateProvince" maxlength="60" /></label>
+              <label data-fiscal-edit="foreign">Valor na moeda do contrato<input name="foreignAmount" inputmode="decimal" placeholder="Vazio = valor em reais se a moeda for 790" /></label>
+              <label data-fiscal-edit="foreign">País do resultado (ISO2)<input name="resultCountry" maxlength="2" /></label>
+              <div class="span-2 fiscal-actions"><button type="button" id="fiscal-edit-cancel" class="fiscal-btn secondary">Cancelar</button><button type="submit" value="default" class="fiscal-btn primary">Salvar correção</button></div>
+              <p class="span-2 fiscal-status" id="fiscal-edit-status"></p>
+            </form>
+          </dialog>
+        </section>
+
         <!-- BACKUP & CONTINGÊNCIA PRO -->
         <section id="view-data" class="view hidden space-y-5">
           <div class="bk-hero">
@@ -1124,6 +1306,10 @@
           <img class="is-square" src="/assets/produtos.png" alt="" width="22" height="22" />
           <span>Backup</span>
         </button>
+        <button type="button" class="m-sheet__item" data-m-view="fiscal">
+          <img class="is-square" src="/assets/imposto.png" alt="" width="22" height="22" />
+          <span>Notas fiscais</span>
+        </button>
 
         <div class="m-sheet__sec">Inteligência</div>
         <button type="button" class="m-sheet__item" data-m-view="analise-ia">
@@ -1223,6 +1409,7 @@
     </div>
   </div>
 
-  <script src="/app.js?v=sessao-renovacao-1"></script>
+  <script src="/fiscal.js?v=2"></script>
+  <script src="/app.js?v=fiscal-1"></script>
 </body>
 </html>

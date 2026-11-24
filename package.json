@@ -18,17 +18,24 @@
     "seed:demo": "node scripts/seed-demo.cjs",
     "sync:auto": "node scripts/run-auto-sync.cjs",
     "push:ontem": "node scripts/push-ontem.cjs",
-    "sync:gcp": "node gcp/sync-server.js"
+    "sync:gcp": "node gcp/sync-server.js",
+    "test:fiscal": "node test/fiscal.test.cjs"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "@supabase/supabase-js": "^2.49.1",
     "@vercel/og": "^1.0.1",
+    "@xmldom/xmldom": "^0.9.12",
+    "fflate": "^0.8.3",
+    "municipios-ibge": "^1.0.1",
+    "node-forge": "^1.4.4",
     "pg": "^8.14.1",
     "puppeteer": "^25.8.0",
     "satori": "^0.29.1",
     "stripe": "^17.7.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "xml-crypto": "^6.4.0",
+    "xmllint-wasm": "^5.3.0"
   },
   "engines": {
     "node": ">=18"
