@@ -44,7 +44,7 @@ Opcionais: `VAPID_*` (push), `CLAUDE_API_KEY` (fallback), Pinterest.
 | `FISCAL_PRODUCTION_ENABLED` | Use `0` até concluir homologação e revisão fiscal |
 | `FISCAL_LAYOUT_VERSION` | Leiaute autorizado pelo conector; atualmente `1.01` |
 | `FISCAL_RESTRICTED_ENABLED` | `1` libera a produção restrita (testes na Sefin Nacional com certificado real) |
-| `FISCAL_ICP_ROOTS_PEM` | Raízes ICP-Brasil (PEM ou caminho). Sem ela a cadeia do certificado não é conferida e a emissão em produção fica bloqueada |
+| `FISCAL_ICP_ROOTS_PEM` | Opcional: ACs ICP-Brasil (PEM ou caminho). Vazio usa `certs/icp-brasil.pem`, o pacote oficial do ITI |
 | `FISCAL_XSD_PATH` | Opcional: zip do pacote XSD oficial; sem ele o servidor baixa do gov.br |
 | `FISCAL_PARAMS_SERVICE` / `FISCAL_PARAMS_PREFIX` | Opcional: caminho da consulta de parâmetros municipais, se o padrão não responder |
 

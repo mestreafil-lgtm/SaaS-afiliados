@@ -3,7 +3,7 @@
   "buildCommand": "npm run build:css",
   "functions": {
     "api/index.js": {
-      "includeFiles": "{server/**,node_modules/@vercel/og/dist/**,node_modules/@resvg/resvg-js/**,node_modules/@resvg/resvg-js-linux-x64-gnu/**}",
+      "includeFiles": "{server/**,certs/**,node_modules/xmllint-wasm/**,node_modules/@vercel/og/dist/**,node_modules/@resvg/resvg-js/**,node_modules/@resvg/resvg-js-linux-x64-gnu/**}",
       "maxDuration": 60
     }
   },

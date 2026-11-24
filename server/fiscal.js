@@ -971,17 +971,20 @@ function icpIdentifiers(certificate) {
 }
 
 let trustedRootsCache = null;
+// ACs ICP-Brasil confiáveis: FISCAL_ICP_ROOTS_PEM (PEM ou caminho) ou, por
+// padrão, o pacote oficial do ITI versionado em certs/icp-brasil.pem.
+const BUNDLED_ICP_PEM = require("path").join(__dirname, "..", "certs", "icp-brasil.pem");
 function trustedRoots() {
   if (trustedRootsCache) return trustedRootsCache;
-  const source = String(process.env.FISCAL_ICP_ROOTS_PEM || "").trim();
-  if (!source) return null;
+  const source = String(process.env.FISCAL_ICP_ROOTS_PEM || "").trim() || BUNDLED_ICP_PEM;
   let pem = source;
   if (!source.includes("-----BEGIN")) {
-    try { pem = require("fs").readFileSync(source, "utf8"); }
-    catch (_) { throw fiscalError("Não foi possível ler as raízes ICP-Brasil configuradas em FISCAL_ICP_ROOTS_PEM.", "ICP_ROOTS_UNAVAILABLE", 503); }
+    const file = require("path").isAbsolute(source) ? source : require("path").join(__dirname, "..", source);
+    try { pem = require("fs").readFileSync(file, "utf8"); }
+    catch (_) { return null; }
   }
-  const blocks = pem.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) || [];
-  trustedRootsCache = blocks.map((block) => forge.pki.certificateFromPem(block));
+  const blocks = pem.match(/-----BEGIN CERTIFICATE-----[sS]+?-----END CERTIFICATE-----/g) || [];
+  trustedRootsCache = blocks.flatMap((block) => { try { return [forge.pki.certificateFromPem(block)]; } catch (_) { return []; } });
   return trustedRootsCache.length ? trustedRootsCache : null;
 }
 
